@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "required": ["greeting", "player_response_hint", "tone", "dialog"],
+  "properties": {
+    "greeting": {
+      "type": "string",
+      "minLength": 5
+    },
+    "player_response_hint": {
+      "type": "string",
+      "minLength": 5
+    },
+    "tone": {
+      "type": "string",
+      "enum": ["warm", "cold", "nervous", "hostile", "mysterious"]
+    },
+    "dialog": {
+      "type": "string",
+      "minLength": 50
+    }
+  }
+}

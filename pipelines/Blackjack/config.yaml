@@ -1,0 +1,178 @@
+pipeline:
+  steps:
+    - name: deal_cards
+      scope: expression
+      description: "Deal 14 cards from a realistic 6-deck shoe (312 cards) using random.sample"
+      expressions:
+        shoe: "[r for r in ['2','3','4','5','6','7','8','9','10','J','Q','K','A'] for _ in range(24)]"
+        dealt: "random.sample(shoe, 14)"
+        player_hand: "[dealt[0], dealt[1]]"
+        dealer_up_card: "dealt[2]"
+        dealer_hole_card: "dealt[3]"
+        extra_cards: "dealt[4:]"
+
+    - name: play_hand
+      prompt_template: play_hand.jinja2
+      description: "Play out the blackjack hand according to the assigned strategy"
+
+    - name: validate_strategy
+      prompt_template: validate_strategy.jinja2
+      description: "Validate that the strategy was followed correctly, scoring accuracy 0.0-1.0"
+
+    - name: analyze_difficulty
+      prompt_template: analyze_difficulty.jinja2
+      description: "Rate the difficulty of decisions made during the hand"
+
+api:
+  retry:
+    max_attempts: 3
+    initial_delay_seconds: 30
+    backoff_multiplier: 2.0
+  realtime:
+    cost_cap_usd: 50.0
+
+processing:
+  strategy: direct
+  repeat: 100
+  chunk_size: 100
+  items:
+    source: items.yaml
+    key: strategies
+    name_field: id
+  validation_retry:
+    max_attempts: 3
+
+prompts:
+  template_dir: templates
+  templates:
+    play_hand: play_hand.jinja2
+    validate_strategy: validate_strategy.jinja2
+    analyze_difficulty: analyze_difficulty.jinja2
+
+schemas:
+  schema_dir: schemas
+  files:
+    play_hand: play_hand.json
+    validate_strategy: validate_strategy.json
+    analyze_difficulty: analyze_difficulty.json
+
+validation:
+  play_hand:
+    required:
+      - strategy_name
+      - action_log
+      - player_final_total
+      - dealer_final_total
+      - player_busted
+      - dealer_busted
+      - result
+      - reasoning
+    types:
+      strategy_name: string
+      action_log: array
+      player_final_total: number
+      dealer_final_total: number
+      player_busted: boolean
+      dealer_busted: boolean
+      result: string
+      reasoning: string
+    enums:
+      result:
+        - player_wins
+        - dealer_wins
+        - push
+
+  validate_strategy:
+    required:
+      - strategy_name
+      - accuracy
+      - deviations
+      - assessment
+    types:
+      strategy_name: string
+      accuracy: number
+      deviations: array
+      assessment: string
+    rules:
+      - name: accuracy_threshold
+        expr: "accuracy >= 0.7"
+        error: "Strategy accuracy {accuracy} is below threshold 0.7 — hand must be replayed"
+        level: error
+
+  analyze_difficulty:
+    required:
+      - strategy_name
+      - result
+      - accuracy
+      - difficulty
+      - difficult_moments
+      - explanation
+    types:
+      strategy_name: string
+      result: string
+      accuracy: number
+      difficulty: string
+      difficult_moments: array
+      explanation: string
+    enums:
+      difficulty:
+        - easy
+        - medium
+        - hard
+      result:
+        - player_wins
+        - dealer_wins
+        - push
+
+post_process:
+  - name: "Win/Loss Rates by Strategy"
+    script: "scripts/analyze_results.py"
+    args:
+      - "--group-by"
+      - "strategy_name"
+      - "--count-field"
+      - "result"
+      - "--net-positive"
+      - "player_wins"
+      - "--net-negative"
+      - "dealer_wins"
+      - "--title"
+      - "Win/Loss Rates by Strategy"
+    output: "win_loss_rates.txt"
+
+  - name: "Difficulty Distribution"
+    script: "scripts/analyze_results.py"
+    args:
+      - "--group-by"
+      - "strategy_name"
+      - "--count-field"
+      - "difficulty"
+      - "--title"
+      - "Difficulty Distribution by Strategy"
+    output: "difficulty_distribution.txt"
+
+  - name: "Strategy Accuracy Scores"
+    script: "scripts/analyze_results.py"
+    args:
+      - "--group-by"
+      - "strategy_name"
+      - "--numeric-field"
+      - "accuracy"
+      - "--title"
+      - "Strategy Accuracy Scores"
+    output: "accuracy_scores.txt"
+
+  - name: "Results CSV"
+    script: "scripts/analyze_results.py"
+    args:
+      - "--group-by"
+      - "strategy_name"
+      - "--count-field"
+      - "result"
+      - "--net-positive"
+      - "player_wins"
+      - "--net-negative"
+      - "dealer_wins"
+      - "--output-format"
+      - "csv"
+    output: "results.csv"

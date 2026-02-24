@@ -1,0 +1,53 @@
+You are a blackjack analyst. Rate the difficulty of the decisions in this hand.
+
+## Dealt Cards
+
+Player's hand: {{ player_hand }}
+Dealer's up card: {{ dealer_up_card }}
+
+## Strategy: {{ strategy_name }}
+{{ strategy_description }}
+
+## Play Record
+
+Action log:
+{% for action in action_log %}
+- {{ action }}
+{% endfor %}
+
+Player final total: {{ player_final_total }}
+Dealer final total: {{ dealer_final_total }}
+Result: {{ result }}
+
+## Strategy Validation
+
+Accuracy: {{ accuracy }}
+Assessment: {{ assessment }}
+
+## Task
+
+Rate the overall difficulty of the decisions in this hand as easy, medium, or hard.
+
+Consider:
+- Was the correct play obvious or ambiguous?
+- Did the hand involve close calls or borderline situations?
+- Would different strategies have made very different choices here?
+- Were there multiple decision points?
+
+Respond with a JSON object in this exact format:
+{
+  "strategy_name": "{{ strategy_name }}",
+  "result": "{{ result }}",
+  "accuracy": {{ accuracy }},
+  "difficulty": "easy" or "medium" or "hard",
+  "difficult_moments": ["moment 1", "moment 2"],
+  "explanation": "Why this hand was easy/medium/hard to play"
+}
+
+Rules:
+- difficulty must be exactly one of: easy, medium, hard
+- difficult_moments should list specific decision points that were challenging (empty array [] if easy)
+- strategy_name must be exactly "{{ strategy_name }}"
+- result must be exactly "{{ result }}"
+- accuracy must be exactly {{ accuracy }}
+- Do not include any text outside the JSON object.

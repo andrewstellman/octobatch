@@ -1,0 +1,47 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "required": [
+    "npc_name",
+    "mood_name",
+    "topic_name",
+    "final_tone",
+    "personality_consistency",
+    "mood_responsiveness",
+    "personality_reasoning",
+    "mood_reasoning"
+  ],
+  "properties": {
+    "npc_name": {
+      "type": "string"
+    },
+    "mood_name": {
+      "type": "string"
+    },
+    "topic_name": {
+      "type": "string"
+    },
+    "final_tone": {
+      "type": "string",
+      "enum": ["warm", "cold", "nervous", "hostile", "mysterious"]
+    },
+    "personality_consistency": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "mood_responsiveness": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "personality_reasoning": {
+      "type": "string",
+      "minLength": 10
+    },
+    "mood_reasoning": {
+      "type": "string",
+      "minLength": 10
+    }
+  }
+}

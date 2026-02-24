@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "required": [
+    "strategy_name",
+    "result",
+    "accuracy",
+    "difficulty",
+    "difficult_moments",
+    "explanation"
+  ],
+  "properties": {
+    "strategy_name": {
+      "type": "string"
+    },
+    "result": {
+      "type": "string",
+      "enum": ["player_wins", "dealer_wins", "push"]
+    },
+    "accuracy": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "difficulty": {
+      "type": "string",
+      "enum": ["easy", "medium", "hard"]
+    },
+    "difficult_moments": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "explanation": {
+      "type": "string",
+      "minLength": 10
+    }
+  }
+}

@@ -1,0 +1,62 @@
+You are a blackjack strategy auditor. Review the following hand and score how accurately the assigned strategy was followed.
+
+## Dealt Cards
+
+Player's hand: {{ player_hand }}
+Dealer's up card: {{ dealer_up_card }}
+Dealer's hole card: {{ dealer_hole_card }}
+Extra cards: {{ extra_cards }}
+
+## Strategy: {{ strategy_name }}
+{{ strategy_description }}
+
+## Play Record
+
+Action log:
+{% for action in action_log %}
+- {{ action }}
+{% endfor %}
+
+Player final total: {{ player_final_total }}
+Dealer final total: {{ dealer_final_total }}
+Player busted: {{ player_busted }}
+Dealer busted: {{ dealer_busted }}
+Result: {{ result }}
+Reasoning: {{ reasoning }}
+
+## Strategy-Specific Checks
+
+Apply the checks for the specific strategy used:
+
+**The Pro** (basic strategy):
+- Did they hit on hard 16 against dealer 7 or higher?
+- Did they stand on 17+?
+- Did they double down on 11?
+- Did they split aces and eights (if applicable)?
+
+**The Gambler** (aggressive):
+- Did they always hit on 16 regardless of dealer card?
+- Did they double down on any 10 or 11?
+- Did they take aggressive risks even with bad odds?
+
+**The Coward** (conservative):
+- Did they stand on any 12 or higher?
+- Did they never double down?
+- Did they never split?
+
+Score the accuracy of strategy adherence from 0.0 to 1.0.
+
+Respond with a JSON object in this exact format:
+{
+  "strategy_name": "{{ strategy_name }}",
+  "accuracy": 0.0 to 1.0,
+  "deviations": ["deviation 1 description", "deviation 2 description"],
+  "assessment": "Overall assessment of strategy adherence"
+}
+
+Rules:
+- accuracy of 1.0 means the strategy was followed perfectly
+- accuracy of 0.0 means the strategy was completely ignored
+- deviations should list specific moments where the strategy was not followed (empty array [] if perfect)
+- Be rigorous — check each decision against the strategy rules
+- Do not include any text outside the JSON object.

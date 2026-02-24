@@ -1,0 +1,41 @@
+personalities:
+  - id: gruff_blacksmith
+    name: "Gruff Blacksmith"
+    description: "A burly, no-nonsense blacksmith who speaks in short, blunt sentences. Values hard work and has little patience for small talk. Responds with grunts and direct statements."
+  - id: wise_elder
+    name: "Wise Elder"
+    description: "An ancient village elder who speaks in proverbs and riddles. Always sees the deeper meaning in things. Measured and calm, never rushed in speech."
+  - id: nervous_merchant
+    name: "Nervous Merchant"
+    description: "A jittery trader who stutters when anxious and constantly glances over his shoulder. Obsessed with profit margins but easily intimidated. Uses filler words and hedging language."
+  - id: cheerful_innkeeper
+    name: "Cheerful Innkeeper"
+    description: "A warm, boisterous innkeeper who treats every visitor like family. Loves gossip, laughs easily, and always offers food or drink. Uses exclamations and friendly nicknames."
+  - id: mysterious_stranger
+    name: "Mysterious Stranger"
+    description: "A cloaked figure who speaks in cryptic, layered phrases. Reveals little about themselves. Every sentence carries a double meaning. Uses pauses and ellipses for dramatic effect."
+
+moods:
+  - id: friendly
+    name: "Friendly"
+    description: "The player approaches warmly, making casual conversation and showing genuine interest in the NPC."
+  - id: aggressive
+    name: "Aggressive"
+    description: "The player is hostile and confrontational, making demands and threatening the NPC."
+  - id: desperate
+    name: "Desperate"
+    description: "The player is panicked and pleading, clearly in urgent need of help with little time to spare."
+  - id: suspicious
+    name: "Suspicious"
+    description: "The player is wary and distrustful, questioning the NPC's motives and looking for deception."
+
+topics:
+  - id: directions
+    name: "Asking for Directions"
+    description: "The player needs to find a specific location — a dungeon entrance, a hidden village, or the road to the next town."
+  - id: bartering
+    name: "Bartering for Items"
+    description: "The player wants to buy, sell, or trade equipment, potions, or other goods with the NPC."
+  - id: quest_info
+    name: "Seeking Quest Information"
+    description: "The player is looking for rumors, quest leads, or information about a threat facing the region."

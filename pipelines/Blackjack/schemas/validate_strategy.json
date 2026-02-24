@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "required": [
+    "strategy_name",
+    "accuracy",
+    "deviations",
+    "assessment"
+  ],
+  "properties": {
+    "strategy_name": {
+      "type": "string"
+    },
+    "accuracy": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "deviations": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "assessment": {
+      "type": "string",
+      "minLength": 10
+    }
+  }
+}

@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "required": ["scenario_name", "final_position", "steps_taken", "path", "outcome"],
+  "properties": {
+    "scenario_name": {
+      "type": "string"
+    },
+    "final_position": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 10
+    },
+    "steps_taken": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "path": {
+      "type": "array",
+      "items": {
+        "type": "integer"
+      }
+    },
+    "outcome": {
+      "type": "string",
+      "enum": ["fell_in_water", "reached_ship"]
+    }
+  }
+}

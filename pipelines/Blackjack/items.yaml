@@ -1,0 +1,12 @@
+strategies:
+  - id: the_pro
+    strategy_name: "The Pro"
+    strategy_description: "Follows basic strategy religiously. Hits on 16 against dealer 7 or higher, stands on 17+, doubles down on 11, splits aces and eights."
+
+  - id: the_gambler
+    strategy_name: "The Gambler"
+    strategy_description: "Plays aggressively and takes risks. Always hits on 16 regardless of dealer card, doubles down on any 10 or 11, chases the win even when the odds are bad."
+
+  - id: the_coward
+    strategy_name: "The Coward"
+    strategy_description: "Terrified of busting. Stands on any 12 or higher no matter what, never doubles down, never splits — would rather lose slowly than risk going over 21."

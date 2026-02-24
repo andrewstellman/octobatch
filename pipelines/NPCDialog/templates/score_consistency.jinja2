@@ -1,0 +1,53 @@
+You are a quality reviewer for RPG dialog. Score the following dialog exchange on two dimensions.
+
+NPC Personality: {{ npc.name }}
+{{ npc.description }}
+
+Player Mood: {{ mood.name }}
+{{ mood.description }}
+
+Conversation Topic: {{ topic.name }}
+{{ topic.description }}
+
+Dialog to review:
+Greeting: {{ greeting }}
+Tone: {{ tone }}
+Full exchange:
+{{ dialog }}
+
+Score this dialog on two dimensions, each from 0.0 to 1.0:
+
+1. **Personality Consistency** — How well does the dialog match the NPC's personality?
+   Use these personality-specific criteria:
+   - Gruff Blacksmith: Should be blunt, use short sentences, show impatience with chatter
+   - Wise Elder: Should use proverbs or metaphors, speak with measured calm, offer deeper insight
+   - Nervous Merchant: Should stutter or hedge, mention prices/profit, show anxiety
+   - Cheerful Innkeeper: Should use exclamations, offer food/drink, use friendly nicknames
+   - Mysterious Stranger: Should be cryptic, use ellipses or pauses, speak in layered meanings
+
+2. **Mood Responsiveness** — Did the dialog acknowledge and react to the player's mood in a way that fits the NPC's personality?
+   Score HIGH (0.7–1.0) if the NPC reacts to the player's mood in a personality-appropriate way, even if the NPC doesn't mirror the mood. For example, a gruff blacksmith being cold and dismissive toward a friendly player IS highly responsive — he's acknowledging the friendliness by brushing it off, which fits his character.
+   Score LOW (0.0–0.3) ONLY if the dialog completely ignores the player's mood with no acknowledgment at all — as if the mood were not specified.
+   Per-mood guidance (reactions should match the NPC's personality):
+   - Friendly: NPC should acknowledge the warmth (reciprocate, dismiss it, be suspicious of it — depending on personality)
+   - Aggressive: NPC should react to the hostility (push back, cower, deflect, stay calm — depending on personality)
+   - Desperate: NPC should acknowledge the urgency (help quickly, exploit it, remain unfazed — depending on personality)
+   - Suspicious: NPC should address the distrust (reassure, get offended, become evasive, ignore it pointedly — depending on personality)
+
+Respond with a JSON object in this exact format:
+{
+  "npc_name": "{{ npc.name }}",
+  "mood_name": "{{ mood.name }}",
+  "topic_name": "{{ topic.name }}",
+  "final_tone": "{{ tone }}",
+  "personality_consistency": 0.0 to 1.0,
+  "mood_responsiveness": 0.0 to 1.0,
+  "personality_reasoning": "Explain why you gave this personality consistency score",
+  "mood_reasoning": "Explain why you gave this mood responsiveness score"
+}
+
+Rules:
+- Scores must be between 0.0 and 1.0
+- final_tone must be exactly one of: warm, cold, nervous, hostile, mysterious
+- Be rigorous — only score above 0.8 if the dialog truly excels on that dimension
+- Do not include any text outside the JSON object.

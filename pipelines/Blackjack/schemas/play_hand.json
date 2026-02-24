@@ -1,0 +1,48 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "required": [
+    "strategy_name",
+    "action_log",
+    "player_final_total",
+    "dealer_final_total",
+    "player_busted",
+    "dealer_busted",
+    "result",
+    "reasoning"
+  ],
+  "properties": {
+    "strategy_name": {
+      "type": "string"
+    },
+    "action_log": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string"
+      }
+    },
+    "player_final_total": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "dealer_final_total": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "player_busted": {
+      "type": "boolean"
+    },
+    "dealer_busted": {
+      "type": "boolean"
+    },
+    "result": {
+      "type": "string",
+      "enum": ["player_wins", "dealer_wins", "push"]
+    },
+    "reasoning": {
+      "type": "string",
+      "minLength": 10
+    }
+  }
+}

@@ -1,0 +1,40 @@
+You are a blackjack simulator. Play out this hand according to the assigned strategy.
+
+## Dealt Cards
+
+Player's hand: {{ player_hand }}
+Dealer's up card: {{ dealer_up_card }}
+Dealer's hole card: {{ dealer_hole_card }}
+Extra cards available for hits: {{ extra_cards }}
+
+## Strategy: {{ strategy_name }}
+{{ strategy_description }}
+
+## Rules
+
+- Standard blackjack rules apply.
+- Card values: 2-10 face value, J/Q/K = 10, A = 11 (or 1 if hand would bust).
+- Player acts first according to the strategy, drawing from extra_cards in order if hitting.
+- Then dealer plays: must hit on 16 or less, stand on 17+.
+- Log each decision as it happens.
+
+Play out the hand step by step. Follow the strategy exactly.
+
+Respond with a JSON object in this exact format:
+{
+  "strategy_name": "{{ strategy_name }}",
+  "action_log": ["action 1 description", "action 2 description"],
+  "player_final_total": <integer>,
+  "dealer_final_total": <integer>,
+  "player_busted": true or false,
+  "dealer_busted": true or false,
+  "result": "player_wins" or "dealer_wins" or "push",
+  "reasoning": "Brief explanation of key decisions and outcome"
+}
+
+Rules for action_log entries:
+- Format player actions as: "Stand: total is 18" or "Hit: drew 7, total now 18" or "Double Down: drew 5, total now 16"
+- Format dealer actions as: "Dealer hits: drew 6, total now 17" or "Dealer stands: total is 19"
+- Log every decision in order, player first then dealer
+- result must be exactly one of: player_wins, dealer_wins, push
+- Do not include any text outside the JSON object.

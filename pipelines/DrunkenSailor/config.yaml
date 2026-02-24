@@ -1,0 +1,92 @@
+pipeline:
+  steps:
+    - name: random_walk
+      scope: expression
+      description: "Simulate random walk - sailor stumbles left or right each step"
+      init:
+        position: "start_position"
+        path: "[start_position]"
+        steps_taken: "0"
+      expressions:
+        direction: "random.choice([-1, 1])"
+        position: "position + direction"
+        path: "path + [position]"
+        steps_taken: "steps_taken + 1"
+      loop_until: "position <= 0 or position >= 10"
+      max_iterations: 1000
+
+    - name: analyze
+      prompt_template: analyze.jinja2
+      description: "Analyze the walk and determine if sailor fell in water or reached ship"
+
+api:
+  retry:
+    max_attempts: 3
+
+processing:
+  strategy: direct
+  repeat: 100
+  chunk_size: 100
+  items:
+    source: items.yaml
+    key: scenarios
+    name_field: id
+
+prompts:
+  template_dir: templates
+  templates:
+    analyze: analyze.jinja2
+
+schemas:
+  schema_dir: schemas
+  files:
+    analyze: analyze.json
+
+validation:
+  analyze:
+    required:
+      - scenario_name
+      - final_position
+      - steps_taken
+      - path
+      - outcome
+    types:
+      scenario_name: string
+      final_position: number
+      steps_taken: number
+      path: array
+      outcome: string
+
+post_process:
+  - name: "Outcome Distribution"
+    script: "scripts/analyze_results.py"
+    args:
+      - "--group-by"
+      - "scenario_name"
+      - "--count-field"
+      - "outcome"
+      - "--title"
+      - "Outcome Distribution by Scenario"
+    output: "outcome_distribution.txt"
+
+  - name: "Steps by Scenario"
+    script: "scripts/analyze_results.py"
+    args:
+      - "--group-by"
+      - "scenario_name"
+      - "--numeric-field"
+      - "steps_taken"
+      - "--title"
+      - "Steps Taken by Scenario"
+    output: "steps_by_scenario.txt"
+
+  - name: "Steps by Outcome"
+    script: "scripts/analyze_results.py"
+    args:
+      - "--group-by"
+      - "outcome"
+      - "--numeric-field"
+      - "steps_taken"
+      - "--title"
+      - "Steps Taken by Outcome"
+    output: "steps_by_outcome.txt"
