@@ -1,0 +1,41 @@
+strategies:
+  - id: the_pro
+    strategy_name: "The Pro"
+    strategy_description: "Follows basic strategy religiously"
+    strategy_rules: |
+      Always hit on hard 8 or less.
+      Hit on hard 9-10 (unless doubling).
+      Always double down on hard 11.
+      Stand on hard 12-16 against dealer 2-6.
+      Hit on hard 12-16 against dealer 7 or higher.
+      Stand on hard 17+.
+      For soft hands (containing an ace counted as 11):
+        Always hit on soft 17 or less.
+        Stand on soft 19+.
+        Hit on soft 18 against dealer 9 or higher.
+        Stand on soft 18 otherwise.
+      Do not split pairs.
+      If dealt a natural 21 (ace + face card or 10), always stand.
+
+  - id: the_gambler
+    strategy_name: "The Gambler"
+    strategy_description: "Plays aggressively and takes risks"
+    strategy_rules: |
+      Double down on any hard 10 or 11.
+      Always hit on 16 or less regardless of dealer card.
+      Stand on 19+.
+      Hit on 17-18 against dealer 7 or higher, stand on 17-18 otherwise.
+      Never split.
+      WARNING: Yes, hitting on 17 or 18 is unusual and risky — that is the whole point of this strategy. The Gambler takes risks that no sane player would. You MUST hit on 17-18 against dealer 7+ even though it feels wrong.
+      If dealt a natural 21, always stand.
+
+  - id: the_coward
+    strategy_name: "The Coward"
+    strategy_description: "Terrified of busting"
+    strategy_rules: |
+      Stand on any 12 or higher no matter what.
+      Hit on 11 or less.
+      Never double down.
+      Never split.
+      WARNING: Yes, standing on 12 against a dealer 10 is a terrible play — that is the whole point of this strategy. The Coward would rather lose slowly than risk busting. You MUST stand on 12+ regardless of the dealer's card.
+      If dealt a natural 21, always stand.

@@ -1,0 +1,45 @@
+You are a blackjack expert analyzing the difficulty of decisions made during a hand.
+
+## Hand Summary
+
+Strategy: {{ strategy_name }} — {{ strategy_description }}
+Player's initial cards: {{ player_card_1 }}, {{ player_card_2 }} (initial total: {{ player_initial_total }})
+Dealer's up card: {{ dealer_up_card }}
+First action taken: {{ first_action }}
+Result: {{ result }}
+
+## Action Log
+{% for entry in action_log %}
+- {{ entry }}
+{% endfor %}
+
+## Difficulty Rating Criteria
+
+Rate the difficulty of the decisions in this hand as "easy", "medium", or "hard" based on these factors:
+
+**Hard situations** (notorious blackjack dilemmas):
+- Player 16 vs dealer 10 (hit and likely bust, stand and likely lose)
+- Player 12-13 vs dealer 2-3 (borderline hit/stand)
+- Player 15 vs dealer 10 (classic hard decision)
+- Soft 18 vs dealer 9-A (hit a seemingly good hand?)
+- Any hand requiring multiple consecutive draws without busting
+
+**Medium situations:**
+- Player 12-16 vs dealer 7-9 (clear basic strategy says hit, but bust risk is real)
+- Player 10-11 double down decisions (clear action but stakes are doubled)
+
+**Easy situations:**
+- Player 17+ (always stand, no decision)
+- Player 8 or less (always hit, no bust risk)
+- Player 20-21 (trivially stand)
+- Dealer busts regardless of player action
+
+Respond with a JSON object in this exact format:
+{
+  "difficulty": "easy|medium|hard",
+  "reasoning": "Brief explanation of why this difficulty was assigned",
+  "strategy_name": "{{ strategy_name }}",
+  "result": "{{ result }}"
+}
+
+Do not include any text outside the JSON object.

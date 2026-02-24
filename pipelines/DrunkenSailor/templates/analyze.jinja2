@@ -1,0 +1,23 @@
+A drunken sailor left a bar and stumbled randomly toward either the ship (position 10, safety) or the water (position 0, falls in).
+
+Starting position: {{ start_position }}
+Final position: {{ position }}
+Steps taken: {{ steps_taken }}
+Path taken: {{ path }}
+
+Analyze the sailor's random walk and determine the outcome.
+
+Respond with a JSON object in this exact format:
+{
+  "scenario_name": "{{ scenario_name }}",
+  "final_position": <final position as integer>,
+  "steps_taken": <number of steps as integer>,
+  "path": [<array of integer positions visited>],
+  "outcome": "fell_in_water" or "reached_ship"
+}
+
+Rules:
+- If final position is 0, outcome is "fell_in_water"
+- If final position is 10, outcome is "reached_ship"
+- path should be the full array of positions from the walk
+- Do not include any text outside the JSON object.

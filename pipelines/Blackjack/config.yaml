@@ -1,0 +1,232 @@
+# ============================================================
+# Blackjack Strategy Comparison Pipeline
+# ============================================================
+# Compares three betting strategies by simulating blackjack hands.
+# Step 1 (expression): Deal random cards from a 6-deck shoe
+# Step 2 (LLM): Play the hand according to assigned strategy
+# Step 3 (expression): Verify hand totals and outcome
+# Step 4 (expression): Verify strategy compliance
+# Step 5 (LLM): Analyze decision difficulty
+# ============================================================
+
+pipeline:
+  steps:
+    - name: deal_cards
+      scope: expression
+      description: "Deal random cards from a 6-deck shoe — player's two cards, dealer's up/hole cards, and separate extra card pools."
+      expressions:
+        _shoe_cards: "['A','2','3','4','5','6','7','8','9','10','J','Q','K'] * 24"
+        _dealt: "random.sample(_shoe_cards, 14)"
+        player_card_1: "_dealt[0]"
+        player_card_2: "_dealt[1]"
+        dealer_up_card: "_dealt[2]"
+        dealer_hole_card: "_dealt[3]"
+        player_extra_cards: "_dealt[4:9]"
+        dealer_extra_cards: "_dealt[9:14]"
+
+    - name: play_hand
+      prompt_template: play_hand.jinja2
+      description: "Play out the blackjack hand according to the assigned strategy, outputting actions, totals, and result."
+
+    - name: verify_hand
+      scope: expression
+      description: "Deterministically verify player/dealer totals, bust detection, and outcome consistency."
+      expressions:
+        _card_val: "{'A': 1, '2': 2, '3': 3, '4': 4, '5': 5, '6': 6, '7': 7, '8': 8, '9': 9, '10': 10, 'J': 10, 'Q': 10, 'K': 10}"
+        _p_cards: "player_cards_used"
+        _d_cards: "dealer_cards_used"
+        _p_sum: "sum([_card_val[c] for c in _p_cards])"
+        _p_aces: "sum([1 for c in _p_cards if c == 'A'])"
+        _p_total: "_p_sum + 10 if (_p_aces >= 1 and _p_sum + 10 <= 21) else _p_sum"
+        _d_sum: "sum([_card_val[c] for c in _d_cards])"
+        _d_aces: "sum([1 for c in _d_cards if c == 'A'])"
+        _d_total: "_d_sum + 10 if (_d_aces >= 1 and _d_sum + 10 <= 21) else _d_sum"
+        _p_busted: "_p_total > 21"
+        _d_busted: "_d_total > 21"
+        _totals_match: "player_final_total == _p_total and dealer_final_total == _d_total"
+        _bust_match: "player_busted == _p_busted and dealer_busted == _d_busted"
+        _expected_result: "'player_wins' if (_d_busted and not _p_busted) else 'player_wins' if (not _p_busted and not _d_busted and _p_total > _d_total) else 'dealer_wins' if _p_busted else 'dealer_wins' if (not _p_busted and not _d_busted and _d_total > _p_total) else 'push'"
+        _result_match: "result == _expected_result"
+        verification_passed: "_totals_match and _bust_match and _result_match"
+        verification_details: "f'Totals match={_totals_match} (player: calc={_p_total} reported={player_final_total}, dealer: calc={_d_total} reported={dealer_final_total}), Bust match={_bust_match} (player: calc={_p_busted} reported={player_busted}, dealer: calc={_d_busted} reported={dealer_busted}), Result match={_result_match} (calc={_expected_result} reported={result})'"
+
+    - name: verify_strategy
+      scope: expression
+      description: "Deterministically verify the player's first action was correct for their strategy."
+      expressions:
+        _card_val_s: "{'A': 1, '2': 2, '3': 3, '4': 4, '5': 5, '6': 6, '7': 7, '8': 8, '9': 9, '10': 10, 'J': 10, 'Q': 10, 'K': 10}"
+        _pit: "player_initial_total"
+        _fa: "first_action"
+        _duc: "dealer_up_card"
+        _has_ace: "player_card_1 == 'A' or player_card_2 == 'A'"
+        _raw_sum: "_card_val_s[player_card_1] + _card_val_s[player_card_2]"
+        _is_soft: "_has_ace and _raw_sum + 10 <= 21"
+        _dealer_high: "_duc in ['7','8','9','10','J','Q','K','A']"
+        _correct_coward: "'stand' if _pit == 21 else 'stand' if _pit >= 12 else 'hit'"
+        _correct_pro: "'stand' if _pit == 21 else 'hit' if _is_soft and _pit <= 17 else 'stand' if _is_soft and _pit >= 19 else 'hit' if _is_soft and _pit == 18 and _duc in ['9','10','J','Q','K','A'] else 'stand' if _is_soft and _pit == 18 else 'hit' if _pit <= 8 else 'hit' if _pit in [9, 10] else 'double_down' if _pit == 11 else 'stand' if 12 <= _pit <= 16 and not _dealer_high else 'hit' if 12 <= _pit <= 16 and _dealer_high else 'stand'"
+        _correct_gambler: "'stand' if _pit == 21 else 'double_down' if not _is_soft and _pit in [10, 11] else 'hit' if _pit <= 16 else 'stand' if _pit >= 19 else 'hit' if 17 <= _pit <= 18 and _dealer_high else 'stand'"
+        _expected_action: "_correct_coward if strategy_name == 'The Coward' else _correct_pro if strategy_name == 'The Pro' else _correct_gambler"
+        strategy_correct: "_fa == _expected_action"
+        strategy_verification_details: "f'Strategy={strategy_name}, player_initial_total={_pit}, dealer_up_card={_duc}, first_action={_fa}, expected={_expected_action}, is_soft={_is_soft}'"
+
+    - name: analyze_difficulty
+      prompt_template: analyze_difficulty.jinja2
+      description: "Rate the difficulty of decisions based on notorious blackjack situations."
+
+# ============================================================
+# API CONFIGURATION
+# ============================================================
+api:
+  retry:
+    max_attempts: 3
+    initial_delay_seconds: 30
+    backoff_multiplier: 2.0
+  poll_interval_seconds: 10
+  realtime:
+    cost_cap_usd: 50.0
+    auto_retry: true
+
+# ============================================================
+# PROCESSING CONFIGURATION
+# ============================================================
+processing:
+  strategy: direct
+  chunk_size: 100
+  repeat: 300
+  items:
+    source: items.yaml
+    key: strategies
+    name_field: id
+  validation_retry:
+    max_attempts: 3
+
+# ============================================================
+# PROMPT TEMPLATES
+# ============================================================
+prompts:
+  template_dir: templates
+  templates:
+    play_hand: play_hand.jinja2
+    analyze_difficulty: analyze_difficulty.jinja2
+
+# ============================================================
+# JSON SCHEMAS
+# ============================================================
+schemas:
+  schema_dir: schemas
+  files:
+    play_hand: play_hand.json
+    analyze_difficulty: analyze_difficulty.json
+
+# ============================================================
+# VALIDATION RULES
+# ============================================================
+validation:
+  verify_hand:
+    required:
+      - verification_passed
+    types:
+      verification_passed: boolean
+    rules:
+      - name: hand_verification
+        expr: "verification_passed == True"
+        error: "Hand verification failed: {verification_details}"
+        level: error
+
+  verify_strategy:
+    required:
+      - strategy_correct
+    types:
+      strategy_correct: boolean
+    rules:
+      - name: strategy_compliance
+        expr: "strategy_correct == True"
+        error: "Strategy verification failed: {strategy_verification_details}"
+        level: error
+
+  play_hand:
+    required:
+      - action_log
+      - player_cards_used
+      - dealer_cards_used
+      - player_final_total
+      - dealer_final_total
+      - player_busted
+      - dealer_busted
+      - result
+      - first_action
+      - player_initial_total
+    types:
+      action_log: array
+      player_cards_used: array
+      dealer_cards_used: array
+      player_final_total: number
+      dealer_final_total: number
+      player_busted: boolean
+      dealer_busted: boolean
+      result: string
+      first_action: string
+      player_initial_total: number
+
+  analyze_difficulty:
+    required:
+      - difficulty
+      - reasoning
+      - strategy_name
+      - result
+    types:
+      difficulty: string
+      reasoning: string
+      strategy_name: string
+      result: string
+
+# ============================================================
+# POST-PROCESSING
+# ============================================================
+post_process:
+  - name: "Strategy Comparison"
+    script: "scripts/analyze_results.py"
+    args:
+      - "--group-by"
+      - "strategy_name"
+      - "--count-field"
+      - "result"
+      - "--net-positive"
+      - "player_wins"
+      - "--net-negative"
+      - "dealer_wins"
+      - "--title"
+      - "Blackjack Strategy Comparison"
+    output: "strategy_comparison.txt"
+
+  - name: "Difficulty Analysis"
+    script: "scripts/analyze_results.py"
+    args:
+      - "--group-by"
+      - "strategy_name"
+      - "--count-field"
+      - "difficulty"
+      - "--title"
+      - "Decision Difficulty by Strategy"
+    output: "difficulty_analysis.txt"
+
+  - name: "Results CSV"
+    script: "scripts/analyze_results.py"
+    args:
+      - "--group-by"
+      - "strategy_name"
+      - "--count-field"
+      - "result"
+      - "--net-positive"
+      - "player_wins"
+      - "--net-negative"
+      - "dealer_wins"
+      - "--output-format"
+      - "csv"
+    output: "results.csv"
+
+  - name: "Compress Raw Results"
+    type: gzip
+    files:
+      - "chunks/*/*_validated.jsonl"
+    keep_originals: false

@@ -1,0 +1,150 @@
+pipeline:
+  steps:
+    - name: generate_dialog
+      prompt_template: generate_dialog.jinja2
+      description: "Generate NPC dialog for the given personality, mood, and topic"
+
+    - name: score_consistency
+      prompt_template: score_consistency.jinja2
+      description: "Score dialog for personality consistency and mood responsiveness"
+
+api:
+  retry:
+    max_attempts: 3
+    initial_delay_seconds: 30
+    backoff_multiplier: 2.0
+  realtime:
+    cost_cap_usd: 50.0
+
+processing:
+  strategy: cross_product
+  chunk_size: 60
+  positions:
+    - name: npc
+      source_key: personalities
+    - name: mood
+      source_key: moods
+    - name: topic
+      source_key: topics
+  items:
+    source: items.yaml
+    name_field: id
+  validation_retry:
+    max_attempts: 3
+
+prompts:
+  template_dir: templates
+  templates:
+    generate_dialog: generate_dialog.jinja2
+    score_consistency: score_consistency.jinja2
+
+schemas:
+  schema_dir: schemas
+  files:
+    generate_dialog: generate_dialog.json
+    score_consistency: score_consistency.json
+
+validation:
+  generate_dialog:
+    required:
+      - greeting
+      - player_response_hint
+      - tone
+      - dialog
+    types:
+      greeting: string
+      player_response_hint: string
+      tone: string
+      dialog: string
+    enums:
+      tone:
+        - warm
+        - cold
+        - nervous
+        - hostile
+        - mysterious
+
+  score_consistency:
+    required:
+      - npc_name
+      - mood_name
+      - topic_name
+      - final_tone
+      - personality_consistency
+      - mood_responsiveness
+      - personality_reasoning
+      - mood_reasoning
+    types:
+      npc_name: string
+      mood_name: string
+      topic_name: string
+      final_tone: string
+      personality_consistency: number
+      mood_responsiveness: number
+      personality_reasoning: string
+      mood_reasoning: string
+    enums:
+      final_tone:
+        - warm
+        - cold
+        - nervous
+        - hostile
+        - mysterious
+    rules:
+      - name: personality_threshold
+        expr: "personality_consistency >= 0.6"
+        error: "Personality consistency {personality_consistency} is below threshold 0.6"
+        level: error
+      - name: mood_threshold
+        expr: "mood_responsiveness >= 0.6"
+        error: "Mood responsiveness {mood_responsiveness} is below threshold 0.6"
+        level: error
+
+post_process:
+  - name: "Tone Distribution by NPC"
+    script: "scripts/analyze_results.py"
+    args:
+      - "--group-by"
+      - "npc_name"
+      - "--count-field"
+      - "final_tone"
+      - "--title"
+      - "Tone Distribution by NPC Personality"
+    output: "tone_distribution.txt"
+
+  - name: "Personality Consistency Scores"
+    script: "scripts/analyze_results.py"
+    args:
+      - "--group-by"
+      - "npc_name"
+      - "--numeric-field"
+      - "personality_consistency"
+      - "--title"
+      - "Average Personality Consistency by NPC"
+    output: "personality_scores.txt"
+
+  - name: "Mood Responsiveness Scores"
+    script: "scripts/analyze_results.py"
+    args:
+      - "--group-by"
+      - "npc_name"
+      - "--numeric-field"
+      - "mood_responsiveness"
+      - "--title"
+      - "Average Mood Responsiveness by NPC"
+    output: "mood_scores.txt"
+
+  - name: "Retry Analysis"
+    script: "pipelines/NPCDialog/post_process.py"
+    output: "retry_analysis.txt"
+
+  - name: "Results CSV"
+    script: "scripts/analyze_results.py"
+    args:
+      - "--group-by"
+      - "npc_name"
+      - "--count-field"
+      - "final_tone"
+      - "--output-format"
+      - "csv"
+    output: "results.csv"

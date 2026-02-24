@@ -1,0 +1,33 @@
+# --- Security ---
+.env
+
+# --- Python & Build ---
+__pycache__/
+*.pyc
+*.egg-info/
+build/
+dist/
+
+# --- Virtual Environment ---
+venv/
+env/
+
+# --- Testing & Coverage ---
+.pytest_cache/
+.coverage
+htmlcov/
+
+# --- OS System Files ---
+.DS_Store
+
+# --- Project Outputs ---
+runs/
+tui_debug.log
+scripts/maintenance/pricing_overrides/*.txt
+tests/results/
+
+# --- IDE Settings (Optional but recommended for public repos) ---
+.vscode/
+.idea/
+.claude/
+

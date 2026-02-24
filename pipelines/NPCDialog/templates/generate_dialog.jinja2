@@ -1,0 +1,28 @@
+You are a dialog writer for a fantasy RPG game. Generate a dialog exchange between an NPC and a player character.
+
+NPC Personality: {{ npc.name }}
+{{ npc.description }}
+
+Player Mood: {{ mood.name }}
+{{ mood.description }}
+
+Conversation Topic: {{ topic.name }}
+{{ topic.description }}
+
+Write a dialog exchange where the NPC speaks in character and responds appropriately to the player's mood. The dialog should feel natural for this specific combination of personality, mood, and topic.
+
+Respond with a JSON object in this exact format:
+{
+  "greeting": "The NPC's opening line when the player approaches",
+  "player_response_hint": "A brief suggestion for how the player might respond given their mood",
+  "tone": "warm|cold|nervous|hostile|mysterious",
+  "dialog": "The full dialog exchange with NPC: and Player: prefixes on each line"
+}
+
+Rules:
+- greeting must be in character for the NPC personality
+- tone must be exactly one of: warm, cold, nervous, hostile, mysterious
+- dialog must include at least 3 exchanges (NPC/Player pairs) with "NPC:" and "Player:" prefixes
+- The NPC's voice must be distinct and consistent with their personality description
+- The player's lines must reflect their mood
+- Do not include any text outside the JSON object.

@@ -1,0 +1,82 @@
+You are simulating a blackjack hand. Play the hand EXACTLY according to the strategy rules below.
+
+## Strategy: {{ strategy_name }}
+{{ strategy_rules }}
+
+## Cards Dealt
+
+Player's cards: {{ player_card_1 }}, {{ player_card_2 }}
+Dealer's up card: {{ dealer_up_card }}
+Dealer's hole card (face down): {{ dealer_hole_card }}
+Player's extra cards (for player hits only, use in order): {{ player_extra_cards }}
+Dealer's extra cards (for dealer hits only, use in order): {{ dealer_extra_cards }}
+
+## Card Values
+
+- Number cards (2-10): face value
+- Face cards (J, Q, K): worth 10
+- Ace: worth 1 by default. ONLY count as 11 if doing so would NOT make the total exceed 21.
+
+## CRITICAL RULES — Read every one carefully before playing
+
+1. **SEPARATE card pools**: The player draws from `player_extra_cards` in order (first card, then second, etc.). The dealer draws from `dealer_extra_cards` in order. These are SEPARATE pools — there is no shared index to track. The player NEVER draws from dealer_extra_cards. The dealer NEVER draws from player_extra_cards.
+
+2. **Dealer's total includes BOTH cards**: The dealer's hand includes BOTH the up card AND the hole card, plus any drawn cards. Do not forget the hole card when calculating the dealer's total.
+
+3. **Dealer MUST play**: After the player's turn is complete, if the player did NOT bust, the dealer MUST play out their hand. Use this exact structured format for the dealer's turn:
+   - "Dealer reveals: [up_card] + [hole_card] = [total]"
+   - For each required hit: "Dealer hits: drew [card] ([running sum]=[new total]), total now [new total]"
+   - Then: "Dealer stands at [final]" or "Dealer busts at [final]"
+   The dealer hits on any total of 16 or less and stands on 17 or higher. Do NOT skip the dealer's turn. Do NOT invent a dealer total — only use cards actually dealt from dealer_extra_cards. If the dealer's initial two cards total 17 or more, the dealer stands immediately — no hits needed.
+
+4. **Show arithmetic**: In every action log entry, show the running arithmetic so the total is traceable.
+   Example: "Hit: drew 7 (10+4+7=21), total now 21"
+
+5. **Ace handling — CRITICAL**: Aces are worth 1 by default. Only count an ace as 11 if doing so would NOT make the total exceed 21. After EVERY hit, if the total exceeds 21 and there is an ace currently counted as 11, you MUST flip it to 1. Always show the ace check:
+   - "Hit: drew A, ace check: 10+4+11=25 > 21 so ace=1, total is 10+4+1=15"
+   - "Hit: drew A, ace check: 5+3+11=19 ≤ 21 so ace=11, total is 19"
+
+6. **NEVER split pairs**: Even if the player has a pair, play it as a single hand. Splitting is not allowed under any strategy.
+
+7. **Result determination**: After both hands are complete, determine the result using these rules IN ORDER:
+   - First, if the player busted (total > 21), the result is dealer_wins — do not compare totals.
+   - Second, if the dealer busted (total > 21), the result is player_wins — do not compare totals.
+   - A bust is an automatic loss regardless of the other hand's total.
+   - Third, if neither busted, compare: higher total wins, equal totals push.
+   Write the result check: "RESULT: Player [total] vs Dealer [total] → [result]"
+
+8. **Totals must match JSON**: The `player_final_total` and `dealer_final_total` in your JSON output MUST exactly match the last running total shown in the action log.
+
+## How to Play
+
+1. Calculate the player's initial hand total from the two dealt cards (with aces counted optimally — as 11 if it keeps total ≤ 21, otherwise as 1).
+2. Apply the strategy rules to decide: hit, stand, or double_down.
+3. If hitting, draw from player_extra_cards in order (first card, then second, etc.). Recalculate total after each draw. Keep going until the strategy says to stand or the player busts.
+4. If the player did NOT bust, play the dealer's hand: dealer starts with up card + hole card, then hits on 16 or less, stands on 17+. The dealer draws from dealer_extra_cards in order.
+5. Determine the result: if player busts → dealer_wins. If dealer busts → player_wins. Otherwise, higher total wins; equal totals push.
+
+## Output Format
+
+Respond with a JSON object in this exact format:
+{
+  "action_log": [
+    "Player initial hand: [card1, card2], total X",
+    "Player action description...",
+    "...more player actions if any...",
+    "Dealer reveals: [up_card] + [hole_card] = X",
+    "Dealer action description...",
+    "...more dealer actions if any...",
+    "RESULT: Player X vs Dealer Y → result"
+  ],
+  "player_cards_used": ["card1", "card2", "...any hit cards from player_extra_cards"],
+  "dealer_cards_used": ["up_card", "hole_card", "...any hit cards from dealer_extra_cards"],
+  "player_final_total": <integer>,
+  "dealer_final_total": <integer>,
+  "player_busted": <boolean>,
+  "dealer_busted": <boolean>,
+  "result": "player_wins|dealer_wins|push",
+  "first_action": "hit|stand|double_down",
+  "player_initial_total": <integer — the player's hand total before any actions, with aces counted optimally>
+}
+
+Do not include any text outside the JSON object.

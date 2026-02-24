@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "required": [
+    "difficulty",
+    "reasoning",
+    "strategy_name",
+    "result"
+  ],
+  "properties": {
+    "difficulty": {
+      "type": "string",
+      "enum": ["easy", "medium", "hard"]
+    },
+    "reasoning": {
+      "type": "string",
+      "minLength": 10
+    },
+    "strategy_name": {
+      "type": "string"
+    },
+    "result": {
+      "type": "string",
+      "enum": ["player_wins", "dealer_wins", "push"]
+    }
+  }
+}

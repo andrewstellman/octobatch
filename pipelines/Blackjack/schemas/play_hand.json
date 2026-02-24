@@ -1,0 +1,65 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "required": [
+    "action_log",
+    "player_cards_used",
+    "dealer_cards_used",
+    "player_final_total",
+    "dealer_final_total",
+    "player_busted",
+    "dealer_busted",
+    "result",
+    "first_action",
+    "player_initial_total"
+  ],
+  "properties": {
+    "action_log": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "minItems": 2
+    },
+    "player_cards_used": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "minItems": 2
+    },
+    "dealer_cards_used": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "minItems": 2
+    },
+    "player_final_total": {
+      "type": "integer",
+      "minimum": 2
+    },
+    "dealer_final_total": {
+      "type": "integer",
+      "minimum": 2
+    },
+    "player_busted": {
+      "type": "boolean"
+    },
+    "dealer_busted": {
+      "type": "boolean"
+    },
+    "result": {
+      "type": "string",
+      "enum": ["player_wins", "dealer_wins", "push"]
+    },
+    "first_action": {
+      "type": "string",
+      "enum": ["hit", "stand", "double_down"]
+    },
+    "player_initial_total": {
+      "type": "integer",
+      "minimum": 2
+    }
+  }
+}
