@@ -4522,3 +4522,325 @@ class TestSecondWaveKnownBugs:
         assert failures_path.exists()
         assert not (chunk_dir / "step_a_failures.jsonl.bak").exists()
         assert manifest["chunks"]["chunk_000"]["failed"] == 1
+
+
+# =============================================================================
+# Expression step retry skip
+# =============================================================================
+
+class TestExpressionStepRetrySkip:
+    """Tests that expression steps skip retry logic (deterministic fast-fail)."""
+
+    def test_expression_step_failures_not_retried(self, tmp_path):
+        """Validation failures on expression steps are NOT queued for retry."""
+        import yaml
+
+        run_dir = tmp_path
+        chunk_dir = run_dir / "chunks" / "chunk_000"
+        chunk_dir.mkdir(parents=True)
+        log_file = run_dir / "RUN_LOG.txt"
+        log_file.touch()
+
+        # Write config with expression step
+        config_dir = run_dir / "config"
+        config_dir.mkdir()
+        config = {
+            "pipeline": {
+                "steps": [
+                    {"name": "verify_hand", "scope": "expression",
+                     "expressions": {"result": "hand_total > 21"}},
+                ]
+            },
+        }
+        config_path = config_dir / "config.yaml"
+        config_path.write_text(yaml.dump(config))
+
+        # Write units
+        with open(chunk_dir / "units.jsonl", "w") as f:
+            f.write(json.dumps({"unit_id": "u1", "hand_total": 15}) + "\n")
+
+        # Write validation failure for the expression step
+        failures_path = chunk_dir / "verify_hand_failures.jsonl"
+        with open(failures_path, "w") as f:
+            f.write(json.dumps({
+                "unit_id": "u1",
+                "failure_stage": "validation",
+                "errors": [{"rule": "hand_valid", "message": "bad hand"}],
+                "retry_count": 0,
+            }) + "\n")
+
+        manifest = {
+            "config": "config/config.yaml",
+            "status": "failed",
+            "pipeline": ["verify_hand"],
+            "chunks": {
+                "chunk_000": {"state": "VALIDATED", "failed": 1, "retries": 0}
+            },
+        }
+
+        archived = retry_validation_failures(run_dir, manifest, log_file)
+
+        # Expression step should NOT create retry chunks
+        assert archived == 0
+        assert "retry_000" not in manifest.get("chunks", {})
+        # Original failures file should be untouched (no .bak rotation)
+        assert failures_path.exists()
+        assert not (chunk_dir / "verify_hand_failures.jsonl.bak").exists()
+
+    def test_llm_step_still_retried_alongside_expression_step(self, tmp_path):
+        """LLM steps are still retried even when expression steps are present."""
+        import yaml
+
+        run_dir = tmp_path
+        chunk_dir = run_dir / "chunks" / "chunk_000"
+        chunk_dir.mkdir(parents=True)
+        log_file = run_dir / "RUN_LOG.txt"
+        log_file.touch()
+
+        # Config with both LLM and expression steps
+        config_dir = run_dir / "config"
+        config_dir.mkdir()
+        config = {
+            "pipeline": {
+                "steps": [
+                    {"name": "generate", "prompt_template": "gen.jinja2"},
+                    {"name": "verify", "scope": "expression",
+                     "expressions": {"ok": "True"}},
+                ]
+            },
+        }
+        config_path = config_dir / "config.yaml"
+        config_path.write_text(yaml.dump(config))
+
+        # Write units
+        with open(chunk_dir / "units.jsonl", "w") as f:
+            f.write(json.dumps({"unit_id": "u1", "data": "test"}) + "\n")
+
+        # LLM step has validation failure (should be retried)
+        with open(chunk_dir / "generate_failures.jsonl", "w") as f:
+            f.write(json.dumps({
+                "unit_id": "u1",
+                "failure_stage": "validation",
+                "errors": [{"rule": "r1", "message": "bad output"}],
+                "retry_count": 0,
+            }) + "\n")
+
+        # Expression step also has validation failure (should NOT be retried)
+        with open(chunk_dir / "verify_failures.jsonl", "w") as f:
+            f.write(json.dumps({
+                "unit_id": "u1",
+                "failure_stage": "validation",
+                "errors": [{"rule": "r2", "message": "bad verify"}],
+                "retry_count": 0,
+            }) + "\n")
+
+        manifest = {
+            "config": "config/config.yaml",
+            "status": "failed",
+            "pipeline": ["generate", "verify"],
+            "chunks": {
+                "chunk_000": {"state": "VALIDATED", "failed": 2, "retries": 0}
+            },
+        }
+
+        archived = retry_validation_failures(run_dir, manifest, log_file)
+
+        # Only the LLM step's failure should be archived
+        assert archived == 1
+        # A retry chunk should exist for the LLM step
+        retry_chunks = [k for k in manifest["chunks"] if k.startswith("retry_")]
+        assert len(retry_chunks) == 1
+        retry_name = retry_chunks[0]
+        assert manifest["chunks"][retry_name]["state"] == "generate_PENDING"
+        # Expression step failure should remain untouched
+        verify_failures = chunk_dir / "verify_failures.jsonl"
+        assert verify_failures.exists()
+        assert not (chunk_dir / "verify_failures.jsonl.bak").exists()
+
+    def test_no_config_falls_through_to_retry(self, tmp_path):
+        """If config can't be loaded, all steps are retried (safe fallback)."""
+        run_dir = tmp_path
+        chunk_dir = run_dir / "chunks" / "chunk_000"
+        chunk_dir.mkdir(parents=True)
+        log_file = run_dir / "RUN_LOG.txt"
+        log_file.touch()
+
+        # No config file exists — config will be None
+        with open(chunk_dir / "units.jsonl", "w") as f:
+            f.write(json.dumps({"unit_id": "u1"}) + "\n")
+
+        with open(chunk_dir / "step_a_failures.jsonl", "w") as f:
+            f.write(json.dumps({
+                "unit_id": "u1",
+                "failure_stage": "validation",
+                "errors": [{"rule": "r1", "message": "bad"}],
+                "retry_count": 0,
+            }) + "\n")
+
+        manifest = {
+            "config": "config/config.yaml",
+            "status": "failed",
+            "pipeline": ["step_a"],
+            "chunks": {
+                "chunk_000": {"state": "VALIDATED", "failed": 1, "retries": 0}
+            },
+        }
+
+        archived = retry_validation_failures(run_dir, manifest, log_file)
+        # Should still retry since config couldn't be loaded (safe fallback)
+        assert archived == 1
+
+    def test_realtime_expression_retries_skip_prompt_prep_and_mark_exhausted(self, tmp_path, monkeypatch):
+        """Realtime retry path skips expression steps and marks failures exhausted."""
+        import yaml
+
+        run_dir = tmp_path
+        chunk_dir = run_dir / "chunks" / "chunk_000"
+        chunk_dir.mkdir(parents=True)
+        log_file = run_dir / "RUN_LOG.txt"
+        log_file.touch()
+
+        config = {
+            "pipeline": {
+                "steps": [
+                    {"name": "verify_hand", "scope": "expression", "expressions": {"ok": "True"}},
+                ]
+            },
+        }
+
+        manifest = {
+            "config": "config/config.yaml",
+            "pipeline": ["verify_hand"],
+            "chunks": {
+                "chunk_000": {"state": "verify_hand_PENDING", "failed": 1, "retries": 0}
+            },
+        }
+
+        config_dir = run_dir / "config"
+        config_dir.mkdir(parents=True, exist_ok=True)
+        with open(config_dir / "config.yaml", "w") as f:
+            yaml.safe_dump(config, f)
+
+        with open(chunk_dir / "units.jsonl", "w") as f:
+            f.write(json.dumps({"unit_id": "u1", "hand_total": 22}) + "\n")
+
+        failures_path = chunk_dir / "verify_hand_failures.jsonl"
+        with open(failures_path, "w") as f:
+            f.write(json.dumps({
+                "unit_id": "u1",
+                "failure_stage": "validation",
+                "errors": [{"rule": "hand_valid", "message": "bad hand"}],
+                "retry_count": 0,
+            }) + "\n")
+
+        def _must_not_prepare_prompts(*args, **kwargs):
+            raise AssertionError("prepare_prompts should not be called for expression retries")
+
+        monkeypatch.setattr(orchestrate, "prepare_prompts", _must_not_prepare_prompts)
+
+        retried, still_failed, in_tokens, out_tokens = orchestrate.run_realtime_retries(
+            run_dir, "verify_hand", config, manifest, log_file, max_retries=5
+        )
+        assert (retried, still_failed, in_tokens, out_tokens) == (0, 0, 0, 0)
+
+        with open(failures_path) as f:
+            line = f.readline().strip()
+        failure = json.loads(line)
+        assert failure["retry_count"] == 5
+
+
+# =============================================================================
+# mark_expression_failures_exhausted — direct unit tests
+# =============================================================================
+
+class TestMarkExpressionFailuresExhausted:
+    """Direct unit tests for mark_expression_failures_exhausted edge cases."""
+
+    def test_nonexistent_file_returns_zero(self, tmp_path):
+        """Non-existent failures file returns 0 without error."""
+        missing = tmp_path / "does_not_exist.jsonl"
+        assert orchestrate.mark_expression_failures_exhausted(missing, max_retries=5) == 0
+
+    def test_already_exhausted_records_left_alone(self, tmp_path):
+        """Records with retry_count >= max_retries are not modified."""
+        failures_file = tmp_path / "step_failures.jsonl"
+        record = {
+            "unit_id": "u1",
+            "failure_stage": "validation",
+            "retry_count": 5,
+        }
+        failures_file.write_text(json.dumps(record) + "\n")
+
+        updated = orchestrate.mark_expression_failures_exhausted(failures_file, max_retries=5)
+        assert updated == 0
+
+        # File should not have been rewritten (early return when updated == 0)
+        reloaded = json.loads(failures_file.read_text().strip())
+        assert reloaded["retry_count"] == 5
+
+    def test_mixed_validation_and_hard_failures(self, tmp_path):
+        """Only validation/schema_validation failures are exhausted; hard failures are untouched."""
+        failures_file = tmp_path / "step_failures.jsonl"
+        validation_fail = {
+            "unit_id": "u1",
+            "failure_stage": "validation",
+            "retry_count": 0,
+        }
+        schema_fail = {
+            "unit_id": "u2",
+            "failure_stage": "schema_validation",
+            "retry_count": 1,
+        }
+        hard_fail = {
+            "unit_id": "u3",
+            "failure_stage": "pipeline_internal",
+            "retry_count": 0,
+        }
+        lines = [json.dumps(r) for r in [validation_fail, schema_fail, hard_fail]]
+        failures_file.write_text("\n".join(lines) + "\n")
+
+        updated = orchestrate.mark_expression_failures_exhausted(failures_file, max_retries=3)
+        assert updated == 2  # validation + schema_validation
+
+        records = [json.loads(l) for l in failures_file.read_text().strip().splitlines()]
+        assert records[0]["retry_count"] == 3  # validation — exhausted
+        assert records[1]["retry_count"] == 3  # schema_validation — exhausted
+        assert records[2]["retry_count"] == 0  # pipeline_internal — untouched
+
+    def test_malformed_json_lines_preserved(self, tmp_path):
+        """Malformed JSON lines are kept as-is in the output."""
+        failures_file = tmp_path / "step_failures.jsonl"
+        valid_record = {
+            "unit_id": "u1",
+            "failure_stage": "validation",
+            "retry_count": 0,
+        }
+        content = json.dumps(valid_record) + "\n" + "THIS IS NOT JSON\n"
+        failures_file.write_text(content)
+
+        updated = orchestrate.mark_expression_failures_exhausted(failures_file, max_retries=5)
+        assert updated == 1
+
+        output_lines = failures_file.read_text().strip().splitlines()
+        assert len(output_lines) == 2
+        assert json.loads(output_lines[0])["retry_count"] == 5
+        assert output_lines[1] == "THIS IS NOT JSON"
+
+    def test_empty_file_returns_zero(self, tmp_path):
+        """An empty failures file returns 0 without error."""
+        failures_file = tmp_path / "step_failures.jsonl"
+        failures_file.write_text("")
+
+        assert orchestrate.mark_expression_failures_exhausted(failures_file, max_retries=5) == 0
+
+    def test_default_failure_stage_treated_as_validation(self, tmp_path):
+        """Records missing failure_stage default to 'validation' and get exhausted."""
+        failures_file = tmp_path / "step_failures.jsonl"
+        record = {"unit_id": "u1", "retry_count": 0}  # no failure_stage
+        failures_file.write_text(json.dumps(record) + "\n")
+
+        updated = orchestrate.mark_expression_failures_exhausted(failures_file, max_retries=3)
+        assert updated == 1
+
+        reloaded = json.loads(failures_file.read_text().strip())
+        assert reloaded["retry_count"] == 3

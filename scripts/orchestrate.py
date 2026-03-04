@@ -838,6 +838,57 @@ def categorize_step_failures(run_dir: Path, step_name: str) -> dict:
     return {"validation": validation, "hard": hard, "total": validation + hard}
 
 
+def mark_expression_failures_exhausted(
+    failures_file: Path,
+    max_retries: int,
+) -> int:
+    """Mark expression validation failures as exhausted (permanent).
+
+    Expression steps are deterministic for a given input, so retrying the same
+    failed validation output is wasteful. We mark validation failures as
+    exhausted by setting retry_count to max_retries.
+
+    Returns:
+        Number of failure records updated.
+    """
+    if not failures_file.exists():
+        return 0
+
+    validation_stages = {"schema_validation", "validation"}
+    updated = 0
+    records = []
+
+    try:
+        with open(failures_file) as f:
+            for line in f:
+                line_s = line.strip()
+                if not line_s:
+                    continue
+                try:
+                    failure = json.loads(line_s)
+                except json.JSONDecodeError:
+                    records.append(line_s)
+                    continue
+
+                stage = failure.get("failure_stage", "validation")
+                retry_count = failure.get("retry_count", 0)
+                if stage in validation_stages and retry_count < max_retries:
+                    failure["retry_count"] = max_retries
+                    updated += 1
+                records.append(json.dumps(failure))
+    except OSError:
+        return 0
+
+    if updated == 0:
+        return 0
+
+    with open(failures_file, "w") as f:
+        for line_s in records:
+            f.write(line_s + "\n")
+
+    return updated
+
+
 def retry_validation_failures(run_dir: Path, manifest: dict, log_file: Path) -> int:
     """Create retry chunks for units with validation failures (unit-level isolation).
 
@@ -865,6 +916,17 @@ def retry_validation_failures(run_dir: Path, manifest: dict, log_file: Path) -> 
     archived_total = 0
     next_retry_num = get_next_retry_number(chunks_dir)
 
+    # Load config to identify expression steps (deterministic — retrying won't help)
+    config = None
+    try:
+        config_rel = manifest.get("config", "config/config.yaml")
+        config_path = run_dir / config_rel
+        if config_path.exists():
+            with open(config_path) as f:
+                config = yaml.safe_load(f)
+    except Exception:
+        pass  # If config unavailable, fall through (no steps will be skipped)
+
     # Iterate over a snapshot of chunk names since we add retry chunks to the dict
     for chunk_name in list(chunks.keys()):
         chunk_data = chunks[chunk_name]
@@ -887,6 +949,11 @@ def retry_validation_failures(run_dir: Path, manifest: dict, log_file: Path) -> 
         chunk_retries = chunk_data.get("retries", chunk_data.get("retry_count", 0))
 
         for step in pipeline:
+            # Expression steps are deterministic — retrying the same math on the
+            # same input produces the same result.  Skip retry and leave the
+            # failures in place as permanent (they'll be counted as hard failures).
+            if config and is_expression_step(config, step):
+                continue
             failures_file = chunk_dir / f"{step}_failures.jsonl"
             if not failures_file.exists():
                 continue
@@ -2591,6 +2658,13 @@ def tick_run(run_dir: Path, max_retries: int = 5) -> dict:
                             input_file=step_input_file,
                             timeout=get_subprocess_timeout(config)
                         )
+                        exhausted = mark_expression_failures_exhausted(failures_file, max_retries)
+                        if exhausted > 0:
+                            log_message(
+                                log_file,
+                                "EXPRESSION",
+                                f"{chunk_name}: Marked {exhausted} validation failures as exhausted for expression step '{step}'",
+                            )
 
                     # Update chunk counts
                     chunk_data["valid"] = valid
@@ -4458,13 +4532,28 @@ def run_realtime_retries(
     Returns:
         Tuple of (retried_count, still_failed_count, input_tokens, output_tokens)
     """
-    from realtime_provider import run_realtime, FatalProviderError
-    from scripts.providers import get_step_provider, ProviderError
-
     chunks = manifest["chunks"]
     pipeline = manifest["pipeline"]
     chunks_dir = run_dir / "chunks"
     config_path = run_dir / manifest["config"]
+
+    # Expression steps are deterministic; retries will reproduce the same output.
+    # Mark existing validation failures as exhausted and skip retry prompt prep.
+    if is_expression_step(config, step):
+        exhausted = 0
+        for chunk_name in chunks.keys():
+            failures_file = chunks_dir / chunk_name / f"{step}_failures.jsonl"
+            exhausted += mark_expression_failures_exhausted(failures_file, max_retries)
+        if exhausted > 0:
+            log_message(
+                log_file,
+                "RETRY",
+                f"{step}: Marked {exhausted} expression validation failures as exhausted; skipping realtime retries",
+            )
+        return (0, 0, 0, 0)
+
+    from realtime_provider import run_realtime, FatalProviderError
+    from scripts.providers import get_step_provider, ProviderError
 
     # Collect retryable failures across all chunks
     # Structure: {unit_id: {"input": {...}, "chunk_name": str, "retry_count": int}}
@@ -5215,6 +5304,13 @@ def realtime_run(
                                 input_file=step_input_file,
                                 timeout=get_subprocess_timeout(config)
                             )
+                            exhausted = mark_expression_failures_exhausted(failures_file, max_retries)
+                            if exhausted > 0:
+                                log_message(
+                                    log_file,
+                                    "EXPRESSION",
+                                    f"{chunk_name}: Marked {exhausted} validation failures as exhausted for expression step '{step}'",
+                                )
 
                         # Advance chunk state after expression step completes
                         # (run_step_realtime does this internally, but expression steps don't)
@@ -5304,6 +5400,17 @@ def realtime_run(
 
 
             progress_this_pass += len(chunks_for_step)
+
+            # Expression steps fast-fail permanently: no retry loop/prompt prep.
+            if is_expression_step(config, step):
+                exhausted_total = 0
+                for chunk_name in chunks_for_step:
+                    failures_file = run_dir / "chunks" / chunk_name / f"{step}_failures.jsonl"
+                    exhausted_total += mark_expression_failures_exhausted(failures_file, max_retries)
+                if exhausted_total > 0:
+                    time_str = datetime.now().strftime("%H:%M:%S")
+                    print(f"[{time_str}] {step}: fast-fail enabled for expression scope ({exhausted_total} exhausted)", flush=True)
+                continue
 
             # Run retries for this step (whether we just ran it or it's from a previous run)
             retry_round = 1
