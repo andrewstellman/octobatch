@@ -216,6 +216,7 @@ Copy and paste these prompts into your AI assistant. Upload the referenced files
 
 | File | What it contains |
 |------|-----------------|
+| `AGENTS.md` | Universal agent instructions — setup, conventions, architecture overview |
 | `pipelines/TOOLKIT.md` | Complete pipeline creation reference |
 | `ai_context/PROJECT_CONTEXT.md` | System architecture and design patterns |
 | `ai_context/DEVELOPMENT_CONTEXT.md` | Current development state and bootstrap chain |
@@ -236,7 +237,7 @@ I've attached two files from the Octobatch project. Read both files. I'm an Octo
 
 You can also paste in screenshots of the TUI — the AI will read the screen and tell you what to do.
 
-**Doing development work** — point your AI coding assistant (Claude Code, Cursor, Copilot) at the bootstrap prompt:
+**Doing development work** — AI coding agents (Claude Code, Cursor, Codex, Gemini CLI) automatically read `AGENTS.md` at the repo root. For Claude Code sessions continuing previous work, use the bootstrap prompt:
 
 ```
 Read ai_context/DEVELOPMENT_CONTEXT.md and bootstrap yourself to continue development.
