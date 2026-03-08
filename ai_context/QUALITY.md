@@ -144,6 +144,14 @@ These scenarios are both human-readable AND specific enough that an LLM reading 
 
 **Generalized lesson:** Framework assumptions shared by all AI advisors represent the highest-risk blind spots. The Council of Three methodology catches defects where models disagree, but cannot catch defects where all models share the same incorrect assumption about system behavior.
 
+### Scenario 10: Expression Step Fast-Fail Empty Chunks
+
+**What happened:** A 1,000-repeat Blackjack batch run on Haiku 4.5 entered an infinite loop after the last LLM step completed. Retry chunks where ALL units were exhausted by expression step fast-fail (verify_hand, verify_strategy) were stuck in a cycle: the orchestrator tried to advance them to analyze_difficulty, couldn't find the previous step's validated.jsonl (because 0 units survived), logged a WARN, and tried again on the next tick. The run could never complete — 20 retry chunks were stuck forever.
+
+**The requirement:** When all units in a retry chunk are exhausted by an expression step (fast-fail), the chunk must be marked as terminal (FAILED). The orchestrator must not attempt to advance empty chunks to subsequent steps. The run must complete normally when all non-empty chunks have finished processing. Fast-fail behavior must be identical in both batch and realtime execution modes.
+
+**How to verify:** Run a Blackjack pipeline with enough repeats to generate expression step failures. Verify the run completes (status: "complete") even if some units fail verify_hand or verify_strategy. Check the log for absence of repeating WARN patterns about missing validated.jsonl files. Run `--verify` and confirm no stuck chunks. Test both batch and realtime modes.
+
 ---
 
 ## The Council of Three — Multi-Model Review Protocol

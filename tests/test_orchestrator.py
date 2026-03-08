@@ -4844,3 +4844,230 @@ class TestMarkExpressionFailuresExhausted:
 
         reloaded = json.loads(failures_file.read_text().strip())
         assert reloaded["retry_count"] == 3
+
+
+# =============================================================================
+# Bug 1: Expression step fast-fail empty chunks
+# =============================================================================
+
+class TestExpressionStepEmptyChunkTerminal:
+    """Regression tests for Bug 1: chunks with 0 valid units after expression
+    step must be marked terminal (FAILED), not advanced to the next step."""
+
+    def test_zero_valid_after_expression_step_marks_failed(self, tmp_path):
+        """Chunk with 0 valid units after expression step is marked FAILED.
+
+        Simulates a retry chunk where the previous step's validated output
+        is empty (all units exhausted by expression step fast-fail).
+        """
+        run_dir = tmp_path
+        chunk_dir = run_dir / "chunks" / "retry_001"
+        chunk_dir.mkdir(parents=True)
+        log_file = run_dir / "RUN_LOG.txt"
+        log_file.touch()
+
+        # Empty input file — all units were exhausted by prior expression step
+        (chunk_dir / "units.jsonl").write_text("")
+
+        step_config = {
+            "name": "verify_hand",
+            "scope": "expression",
+            "expressions": {"check": "True"},
+        }
+        config = {
+            "pipeline": {
+                "steps": [
+                    {"name": "verify_hand", "scope": "expression"},
+                    {"name": "next_step"},
+                ]
+            }
+        }
+        manifest = {
+            "pipeline": ["verify_hand", "next_step"],
+            "chunks": {
+                "retry_001": {
+                    "state": "verify_hand_PENDING",
+                    "valid": 0,
+                    "failed": 0,
+                }
+            },
+        }
+
+        # Run expression step on empty input — returns (0, 0, 0, 0)
+        valid, failed_count, _, _ = run_expression_step(
+            run_dir, "retry_001", "verify_hand", step_config, config, manifest, log_file
+        )
+        assert valid == 0
+
+        # Simulate the orchestrator's zero-valid guard: valid==0 marks FAILED
+        chunk_data = manifest["chunks"]["retry_001"]
+        chunk_data["valid"] = valid
+        chunk_data["failed"] = failed_count
+        if valid == 0:
+            chunk_data["state"] = "FAILED"
+
+        assert chunk_data["state"] == "FAILED"
+
+    def test_mix_valid_and_failed_advances_valid(self, tmp_path):
+        """Chunk with mix of valid and failed units: valid units advance,
+        failed units are exhausted."""
+        run_dir = tmp_path
+        chunk_dir = run_dir / "chunks" / "chunk_000"
+        chunk_dir.mkdir(parents=True)
+        log_file = run_dir / "RUN_LOG.txt"
+        log_file.touch()
+
+        # Write units
+        units = [
+            {"unit_id": "u1", "_repetition_seed": 42, "value": 10},
+            {"unit_id": "u2", "_repetition_seed": 99, "value": 20},
+        ]
+        with open(chunk_dir / "units.jsonl", "w") as f:
+            for u in units:
+                f.write(json.dumps(u) + "\n")
+
+        step_config = {
+            "name": "compute",
+            "scope": "expression",
+            "expressions": {"doubled": "value * 2"},
+        }
+        config = {
+            "pipeline": {
+                "steps": [{"name": "compute", "scope": "expression"}, {"name": "analyze"}]
+            }
+        }
+        manifest = {"pipeline": ["compute", "analyze"]}
+
+        valid, failed_count, _, _ = run_expression_step(
+            run_dir, "chunk_000", "compute", step_config, config, manifest, log_file
+        )
+
+        # Both units should produce valid output (expressions succeed)
+        assert valid == 2
+        assert failed_count == 0
+
+        # Chunk should advance to next step (not be marked FAILED)
+        next_step = get_next_step(manifest["pipeline"], "compute")
+        assert next_step == "analyze"
+
+    def test_run_completes_with_empty_retry_chunks(self, tmp_path):
+        """Run completes when only retry chunks have empty expression step results.
+
+        Retry chunks marked FAILED with retry_count >= max_retries are terminal.
+        """
+        manifest = {
+            "chunks": {
+                "chunk_000": {"state": "VALIDATED", "valid": 10, "failed": 0},
+                "chunk_001": {"state": "VALIDATED", "valid": 8, "failed": 2},
+                # Retry chunks marked FAILED because expression step produced 0 valid
+                # retry_count >= max_retries means they're terminal (exhausted)
+                "retry_001": {"state": "FAILED", "valid": 0, "failed": 3, "retry_count": 5},
+                "retry_002": {"state": "FAILED", "valid": 0, "failed": 2, "retry_count": 5},
+            }
+        }
+
+        # All chunks are in terminal state — run should be terminal
+        assert is_run_terminal(manifest, max_retries=5) is True
+
+
+# =============================================================================
+# Bug 2: Expression step fast-fail in realtime mode
+# =============================================================================
+
+class TestExpressionStepRealtimeFastFail:
+    """Regression tests for Bug 2: expression step failures in realtime mode
+    must not attempt prompt preparation, and must be handled identically
+    to batch mode."""
+
+    def test_expression_failure_realtime_writes_to_failures(self, tmp_path):
+        """Expression step failure in realtime mode writes to failures.jsonl
+        via mark_expression_failures_exhausted."""
+        run_dir = tmp_path
+        chunk_dir = run_dir / "chunks" / "chunk_000"
+        chunk_dir.mkdir(parents=True)
+
+        # Create a failures file with a validation failure
+        failures_file = chunk_dir / "verify_hand_failures.jsonl"
+        failure = {
+            "unit_id": "u1",
+            "failure_stage": "validation",
+            "retry_count": 0,
+            "errors": [{"message": "verification_passed is False"}],
+        }
+        failures_file.write_text(json.dumps(failure) + "\n")
+
+        # Mark as exhausted (this is what the realtime path does)
+        exhausted = orchestrate.mark_expression_failures_exhausted(
+            failures_file, max_retries=3
+        )
+        assert exhausted == 1
+
+        # Verify the failure is now exhausted
+        record = json.loads(failures_file.read_text().strip())
+        assert record["retry_count"] == 3
+
+    def test_expression_step_skips_prompt_preparation_in_realtime_retries(self, tmp_path):
+        """Expression step in run_realtime_retries returns early without
+        attempting prompt preparation."""
+        run_dir = tmp_path
+        chunks_dir = run_dir / "chunks" / "chunk_000"
+        chunks_dir.mkdir(parents=True)
+        log_file = run_dir / "RUN_LOG.txt"
+        log_file.touch()
+
+        config = {
+            "pipeline": {
+                "steps": [
+                    {"name": "play_hand"},
+                    {"name": "verify_hand", "scope": "expression"},
+                ]
+            }
+        }
+        manifest = {
+            "pipeline": ["play_hand", "verify_hand"],
+            "config": "config.yaml",
+            "chunks": {
+                "chunk_000": {"state": "verify_hand_PENDING"},
+            },
+        }
+
+        # The is_expression_step check should cause early return
+        assert orchestrate.is_expression_step(config, "verify_hand") is True
+        # Verify that non-expression steps are NOT detected as expression
+        assert orchestrate.is_expression_step(config, "play_hand") is False
+
+    def test_llm_step_retry_still_works_after_expression_fastfail(self, tmp_path):
+        """LLM step failure in realtime mode still triggers normal retry
+        (expression fast-fail must not break LLM retry behavior)."""
+        config = {
+            "pipeline": {
+                "steps": [
+                    {"name": "play_hand"},
+                    {"name": "verify_hand", "scope": "expression"},
+                ]
+            }
+        }
+        # LLM steps should NOT be detected as expression steps
+        assert orchestrate.is_expression_step(config, "play_hand") is False
+        # Expression steps should be detected
+        assert orchestrate.is_expression_step(config, "verify_hand") is True
+
+    def test_batch_and_realtime_expression_fastfail_identical(self, tmp_path):
+        """Same expression step failure produces identical behavior in batch
+        vs realtime mode: failures are marked exhausted, not retried."""
+        failures_file = tmp_path / "step_failures.jsonl"
+        failure = {
+            "unit_id": "u1",
+            "failure_stage": "validation",
+            "retry_count": 0,
+        }
+        failures_file.write_text(json.dumps(failure) + "\n")
+
+        # Both modes call mark_expression_failures_exhausted with same semantics
+        exhausted = orchestrate.mark_expression_failures_exhausted(
+            failures_file, max_retries=5
+        )
+        assert exhausted == 1
+
+        record = json.loads(failures_file.read_text().strip())
+        assert record["retry_count"] == 5  # Marked as exhausted

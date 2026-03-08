@@ -196,6 +196,31 @@ class TestCoerceValue:
         assert val == float("inf")
         assert ok is False
 
+    def test_float_neg_inf_not_coerced(self):
+        """-Infinity with integer type returns unchanged, no exception."""
+        val, ok = _coerce_value(float("-inf"), "integer", "$.x")
+        assert val == float("-inf")
+        assert ok is False
+
+    def test_float_nan_number_not_coerced(self):
+        """NaN with number type returns unchanged — NaN is not valid JSON."""
+        val, ok = _coerce_value(float("nan"), "number", "$.x")
+        assert isinstance(val, float)
+        assert math.isnan(val)
+        assert ok is False
+
+    def test_float_inf_number_not_coerced(self):
+        """Infinity with number type returns unchanged — not valid JSON."""
+        val, ok = _coerce_value(float("inf"), "number", "$.x")
+        assert val == float("inf")
+        assert ok is False
+
+    def test_float_neg_inf_number_not_coerced(self):
+        """-Infinity with number type returns unchanged — not valid JSON."""
+        val, ok = _coerce_value(float("-inf"), "number", "$.x")
+        assert val == float("-inf")
+        assert ok is False
+
     def test_str_to_float(self):
         val, ok = _coerce_value("3.14", "number", "$.x")
         assert val == 3.14 and ok

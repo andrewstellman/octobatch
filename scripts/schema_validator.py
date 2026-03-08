@@ -110,6 +110,10 @@ def _coerce_value(value: Any, expected_type: str, path: str) -> tuple[Any, bool]
                 return coerced, True
 
     elif expected_type == "number":
+        # Non-finite floats (NaN, Inf, -Inf) must not be coerced — they are
+        # not valid JSON numbers.  Let them flow into structured validation.
+        if isinstance(value, float) and not math.isfinite(value):
+            return value, False
         if isinstance(value, str):
             try:
                 coerced = float(value)

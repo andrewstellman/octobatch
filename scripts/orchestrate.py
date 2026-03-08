@@ -2670,10 +2670,15 @@ def tick_run(run_dir: Path, max_retries: int = 5) -> dict:
                     chunk_data["valid"] = valid
                     chunk_data["failed"] = failed_count
 
-                    # If zero valid and some failed, mark chunk FAILED — don't advance
-                    if needs_validation and valid == 0 and failed_count > 0:
-                        log_message(log_file, "STOP", f"{chunk_name}: Expression step {step} produced 0 valid units out of {failed_count}. Marking chunk as FAILED.")
+                    # If zero valid units, mark chunk FAILED — don't advance.
+                    # This catches: all units failed validation, empty input file,
+                    # or expression step produced no output (e.g. retry chunks
+                    # where all units were exhausted by a prior expression step).
+                    if valid == 0:
+                        log_message(log_file, "STOP", f"{chunk_name}: Expression step {step} produced 0 valid units (failed={failed_count}). Marking chunk as FAILED.")
                         chunk_data["state"] = "FAILED"
+                        # Mark terminal so is_run_terminal() can complete the run.
+                        chunk_data["retries"] = max_retries
                         failed += 1
                         save_manifest(run_dir, manifest)
                     else:
@@ -2722,7 +2727,11 @@ def tick_run(run_dir: Path, max_retries: int = 5) -> dict:
                 units_file = chunk_dir / f"{prev_step}_validated.jsonl"
 
                 if not units_file.exists():
-                    log_message(log_file, "WARN", f"{chunk_name}: Previous step output not found: {units_file}")
+                    log_message(log_file, "STOP", f"{chunk_name}: Previous step '{prev_step}' produced no validated output (missing {units_file.name}). Marking chunk as FAILED.")
+                    chunk_data["state"] = "FAILED"
+                    chunk_data["retries"] = max_retries
+                    failed += 1
+                    save_manifest(run_dir, manifest)
                     continue
             elif step != pipeline[0]:
                 # Regular chunks for steps after first need previous step's validated output
@@ -2731,7 +2740,11 @@ def tick_run(run_dir: Path, max_retries: int = 5) -> dict:
                 units_file = chunk_dir / f"{prev_step}_validated.jsonl"
 
                 if not units_file.exists():
-                    log_message(log_file, "WARN", f"{chunk_name}: Previous step output not found: {units_file}")
+                    log_message(log_file, "STOP", f"{chunk_name}: Previous step '{prev_step}' produced no validated output (missing {units_file.name}). Marking chunk as FAILED.")
+                    chunk_data["state"] = "FAILED"
+                    chunk_data["retries"] = max_retries
+                    failed += 1
+                    save_manifest(run_dir, manifest)
                     continue
             else:
                 # First step of regular chunk uses units.jsonl
@@ -5318,10 +5331,13 @@ def realtime_run(
                         chunk_data["valid"] = valid
                         chunk_data["failed"] = failed
 
-                        # If validation produced 0 valid and some failed, mark FAILED
-                        if needs_validation and valid == 0 and failed > 0:
-                            log_message(log_file, "STOP", f"{chunk_name}: Expression step {step} produced 0 valid units out of {failed}. Marking chunk as FAILED.")
+                        # If zero valid units, mark chunk FAILED — don't advance.
+                        # Catches all-failed validation, empty input, or exhausted retry chunks.
+                        if valid == 0:
+                            log_message(log_file, "STOP", f"{chunk_name}: Expression step {step} produced 0 valid units (failed={failed}). Marking chunk as FAILED.")
                             chunk_data["state"] = "FAILED"
+                            # Mark terminal so realtime completion can converge.
+                            chunk_data["retries"] = max_retries
                         else:
                             next_step = get_next_step(pipeline, step)
                             if next_step:
