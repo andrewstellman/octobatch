@@ -147,9 +147,12 @@ def evaluate_expressions(
 
     interpreter = create_seeded_interpreter(seed_or_rng)
 
-    # Add context variables to interpreter
+    # Add context variables to interpreter.
+    # Allow underscore-prefixed computation variables (e.g., _dealer_hand, _total)
+    # but skip system-internal fields that should not be in the expression namespace.
+    _SYSTEM_FIELDS = {"_metadata", "_raw_text", "_repetition_seed"}
     for key, value in context.items():
-        if not key.startswith('_'):  # Skip private fields
+        if key not in _SYSTEM_FIELDS:
             interpreter.symtable[key] = value
 
     results = {}
@@ -193,9 +196,10 @@ def evaluate_condition(expr: str, context: dict, seed_or_rng=None) -> bool:
     else:
         interpreter = Interpreter()
 
-    # Add context variables
+    # Add context variables (allow _-prefixed computation vars, skip system fields)
+    _SYSTEM_FIELDS = {"_metadata", "_raw_text", "_repetition_seed"}
     for key, value in context.items():
-        if not key.startswith('_'):  # Skip metadata
+        if key not in _SYSTEM_FIELDS:
             interpreter.symtable[key] = value
 
     result = interpreter(expr)

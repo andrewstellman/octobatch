@@ -5071,3 +5071,457 @@ class TestExpressionStepRealtimeFastFail:
 
         record = json.loads(failures_file.read_text().strip())
         assert record["retry_count"] == 5  # Marked as exhausted
+
+
+# =============================================================================
+# v1.0.3 Bug 1: Zero-valid-units not handled for LLM validation steps
+# =============================================================================
+
+class TestLLMStepZeroValidTerminal:
+    """Tests for v1.0.3 Bug 1: generalize zero-valid-units terminal logic
+    to ALL step types, not just expression steps."""
+
+    def test_llm_step_zero_valid_retries_exhausted_marks_terminal(self, tmp_path):
+        """LLM step chunk with 0 valid after validation and retries exhausted → marked terminal."""
+        manifest = {
+            "chunks": {
+                # Retry chunk that has exhausted retries (retry_count >= max_retries)
+                "retry_003": {
+                    "state": "FAILED",
+                    "valid": 0,
+                    "failed": 5,
+                    "retry_count": 3,
+                    "retries": 3,
+                },
+            }
+        }
+        # With max_retries=3, retry_count=3 means exhausted → terminal
+        assert is_run_terminal(manifest, max_retries=3) is True
+
+    def test_llm_step_zero_valid_retries_remaining_not_terminal(self, tmp_path):
+        """LLM step chunk with 0 valid but retries remaining → NOT marked terminal."""
+        manifest = {
+            "chunks": {
+                "chunk_000": {
+                    "state": "FAILED",
+                    "valid": 0,
+                    "failed": 5,
+                    "retry_count": 1,
+                    "retries": 1,
+                },
+            }
+        }
+        # With max_retries=3, retry_count=1 means retries remaining → not terminal
+        assert is_run_terminal(manifest, max_retries=3) is False
+
+    def test_mixed_chunk_valid_advance_not_terminal(self, tmp_path):
+        """Mixed chunk (some valid, some failed, retries exhausted) → valid units advance, chunk not terminal only if processing."""
+        manifest = {
+            "chunks": {
+                # Chunk with some valid and some failed — advanced to next step
+                "chunk_000": {
+                    "state": "step2_PENDING",
+                    "valid": 5,
+                    "failed": 3,
+                },
+            }
+        }
+        # Chunk is in PENDING state (not terminal)
+        assert is_run_terminal(manifest, max_retries=3) is False
+
+    def test_run_completes_when_all_chunks_drop_to_zero_valid(self, tmp_path):
+        """Run completes when all chunks in a step drop to 0 valid after retry exhaustion."""
+        manifest = {
+            "chunks": {
+                # Some chunks validated normally
+                "chunk_000": {"state": "VALIDATED", "valid": 10, "failed": 0},
+                # All retry chunks exhausted with 0 valid
+                "retry_000": {
+                    "state": "FAILED", "valid": 0, "failed": 5,
+                    "retries": 5, "retry_count": 5,
+                },
+                "retry_001": {
+                    "state": "FAILED", "valid": 0, "failed": 3,
+                    "retries": 5, "retry_count": 5,
+                },
+            }
+        }
+        assert is_run_terminal(manifest, max_retries=5) is True
+
+    def test_retry_validation_failures_skips_exhausted_units(self, tmp_path):
+        """retry_validation_failures does not create retry chunks for units at max_retries."""
+        run_dir = tmp_path
+        chunk_dir = run_dir / "chunks" / "chunk_000"
+        chunk_dir.mkdir(parents=True)
+
+        # Create a failures file with a unit at max retries
+        failures_file = chunk_dir / "step1_failures.jsonl"
+        failure = {
+            "unit_id": "u1",
+            "failure_stage": "validation",
+            "retry_count": 3,
+            "errors": [{"message": "failed business logic"}],
+        }
+        failures_file.write_text(json.dumps(failure) + "\n")
+
+        # Create input file
+        units_file = chunk_dir / "units.jsonl"
+        units_file.write_text(json.dumps({"unit_id": "u1", "data": "test"}) + "\n")
+
+        # Create a config without expression steps
+        config_path = run_dir / "config" / "config.yaml"
+        config_path.parent.mkdir(parents=True)
+        config_path.write_text("pipeline:\n  steps:\n    - name: step1\n      scope: llm\n")
+
+        manifest = {
+            "pipeline": ["step1"],
+            "chunks": {
+                "chunk_000": {
+                    "state": "FAILED",
+                    "valid": 0,
+                    "failed": 1,
+                    "retry_count": 3,
+                },
+            },
+            "config": "config/config.yaml",
+        }
+
+        log_file = run_dir / "RUN_LOG.txt"
+        log_file.touch()
+
+        # With max_retries=3, unit at retry_count=3 should be skipped
+        archived = orchestrate.retry_validation_failures(run_dir, manifest, log_file, max_retries=3)
+
+        # No retry chunks should be created
+        assert "retry_000" not in manifest["chunks"]
+        assert archived == 0
+
+    def test_retry_validation_failures_creates_retry_for_non_exhausted(self, tmp_path):
+        """retry_validation_failures creates retry chunks for units below max_retries."""
+        run_dir = tmp_path
+        chunk_dir = run_dir / "chunks" / "chunk_000"
+        chunk_dir.mkdir(parents=True)
+
+        # Create a failures file with a unit below max retries
+        failures_file = chunk_dir / "step1_failures.jsonl"
+        failure = {
+            "unit_id": "u1",
+            "failure_stage": "validation",
+            "retry_count": 1,
+            "errors": [{"message": "failed business logic"}],
+        }
+        failures_file.write_text(json.dumps(failure) + "\n")
+
+        # Create input file
+        units_file = chunk_dir / "units.jsonl"
+        units_file.write_text(json.dumps({"unit_id": "u1", "data": "test"}) + "\n")
+
+        # Create a config
+        config_path = run_dir / "config" / "config.yaml"
+        config_path.parent.mkdir(parents=True)
+        config_path.write_text("pipeline:\n  steps:\n    - name: step1\n      scope: llm\n")
+
+        manifest = {
+            "pipeline": ["step1"],
+            "chunks": {
+                "chunk_000": {
+                    "state": "FAILED",
+                    "valid": 0,
+                    "failed": 1,
+                    "retry_count": 1,
+                },
+            },
+            "config": "config/config.yaml",
+        }
+
+        log_file = run_dir / "RUN_LOG.txt"
+        log_file.touch()
+
+        # With max_retries=3, unit at retry_count=1 should be retried
+        archived = orchestrate.retry_validation_failures(run_dir, manifest, log_file, max_retries=3)
+
+        # A retry chunk should be created
+        assert archived == 1
+        retry_chunks = [k for k in manifest["chunks"] if k.startswith("retry_")]
+        assert len(retry_chunks) == 1
+        retry_chunk = manifest["chunks"][retry_chunks[0]]
+        assert retry_chunk["state"] == "step1_PENDING"
+
+
+# =============================================================================
+# v1.0.3 Bug 2: Post-processing runs before all retries complete
+# =============================================================================
+
+class TestPostProcessingBarrier:
+    """Tests for v1.0.3 Bug 2: post-processing must be a global pipeline barrier."""
+
+    def test_post_processing_not_run_while_chunks_non_terminal(self, tmp_path):
+        """Post-processing does not run while any chunk in any step is non-terminal."""
+        manifest = {
+            "chunks": {
+                "chunk_000": {"state": "VALIDATED", "valid": 10, "failed": 0},
+                # Retry chunk still in-flight
+                "retry_000": {
+                    "state": "step1_PENDING",
+                    "valid": 0,
+                    "failed": 0,
+                    "retry_count": 1,
+                },
+            }
+        }
+        # Not terminal because retry_000 is PENDING
+        assert is_run_terminal(manifest, max_retries=5) is False
+
+    def test_post_processing_runs_after_all_chunks_terminal(self, tmp_path):
+        """Post-processing runs after all chunks reach terminal state."""
+        manifest = {
+            "chunks": {
+                "chunk_000": {"state": "VALIDATED", "valid": 10, "failed": 0},
+                "retry_000": {
+                    "state": "FAILED",
+                    "valid": 0,
+                    "failed": 3,
+                    "retries": 5,
+                    "retry_count": 5,
+                },
+            }
+        }
+        # Terminal because all chunks are VALIDATED or FAILED with retries exhausted
+        assert is_run_terminal(manifest, max_retries=5) is True
+
+    def test_submitted_chunk_prevents_terminal(self, tmp_path):
+        """A SUBMITTED chunk in any step prevents is_run_terminal from returning True."""
+        manifest = {
+            "chunks": {
+                "chunk_000": {"state": "VALIDATED", "valid": 10, "failed": 0},
+                "chunk_001": {"state": "step2_SUBMITTED", "valid": 0, "failed": 0},
+            }
+        }
+        assert is_run_terminal(manifest, max_retries=5) is False
+
+
+# =============================================================================
+# v1.0.3 Bug 3: Failure records missing upstream fields
+# =============================================================================
+
+class TestFailureRecordUpstreamFields:
+    """Tests for v1.0.3 Bug 3: failure records must include accumulated
+    upstream context fields from items and prior validated steps."""
+
+    def _create_run_with_validation(self, tmp_path, step_name, pipeline,
+                                     input_data, results_data, config_yaml):
+        """Helper: set up run dir with validation config and run pipeline."""
+        run_dir = tmp_path
+        chunk_dir = run_dir / "chunks" / "chunk_000"
+        chunk_dir.mkdir(parents=True)
+
+        # Write config
+        config_dir = run_dir / "config"
+        config_dir.mkdir()
+        config_path = config_dir / "config.yaml"
+        config_path.write_text(config_yaml)
+
+        # Write input file (accumulated context from prior steps)
+        if pipeline.index(step_name) == 0:
+            input_file = chunk_dir / "units.jsonl"
+        else:
+            prev_step = pipeline[pipeline.index(step_name) - 1]
+            input_file = chunk_dir / f"{prev_step}_validated.jsonl"
+        input_file.write_text(
+            "\n".join(json.dumps(item) for item in input_data) + "\n"
+        )
+
+        # Write results file (step output to validate)
+        results_file = chunk_dir / f"{step_name}_results.jsonl"
+        results_file.write_text(
+            "\n".join(json.dumps(r) for r in results_data) + "\n"
+        )
+
+        validated_file = chunk_dir / f"{step_name}_validated.jsonl"
+        failures_file = chunk_dir / f"{step_name}_failures.jsonl"
+        log_file = run_dir / "RUN_LOG.txt"
+        log_file.touch()
+
+        return run_dir, config_path, results_file, validated_file, failures_file, log_file, input_file
+
+    def test_failure_record_contains_items_fields(self, tmp_path):
+        """Failure record from expression step contains fields from items file (e.g., strategy_name)."""
+        input_data = [
+            {
+                "unit_id": "the_pro__rep0001",
+                "strategy_name": "The Pro",
+                "player_card_1": "K",
+                "dealer_up_card": "7",
+            }
+        ]
+
+        results_data = [
+            {
+                "unit_id": "the_pro__rep0001",
+                "verification_passed": False,
+                "verification_details": "hand total incorrect",
+            }
+        ]
+
+        config_yaml = """
+pipeline:
+  steps:
+    - name: deal_cards
+      scope: expression
+    - name: verify_hand
+      scope: expression
+validation:
+  verify_hand:
+    rules:
+      - field: verification_passed
+        expr: "verification_passed == True"
+        level: error
+        message: "Verification failed"
+"""
+
+        run_dir, config_path, results_file, validated_file, failures_file, log_file, input_file = \
+            self._create_run_with_validation(
+                tmp_path, "verify_hand", ["deal_cards", "verify_hand"],
+                input_data, results_data, config_yaml
+            )
+
+        valid_count, failed_count = orchestrate.run_validation_pipeline(
+            results_file, validated_file, failures_file,
+            None,  # no schema
+            config_path, "verify_hand", log_file, "chunk_000",
+            input_file=input_file
+        )
+
+        assert valid_count == 0
+        assert failed_count == 1
+
+        failure = json.loads(failures_file.read_text().strip())
+
+        # Upstream fields should be at top level of failure record
+        assert failure.get("strategy_name") == "The Pro"
+        assert failure.get("player_card_1") == "K"
+        assert failure.get("dealer_up_card") == "7"
+
+        # Failure-specific fields should also be present
+        assert failure.get("unit_id") == "the_pro__rep0001"
+        assert "errors" in failure
+
+    def test_failure_record_contains_prior_step_fields(self, tmp_path):
+        """Failure record contains fields from prior validated steps."""
+        input_data = [
+            {
+                "unit_id": "the_gambler__rep0005",
+                "strategy_name": "The Gambler",
+                "player_card_1": "5",
+                "player_card_2": "3",
+                "dealer_up_card": "K",
+                "player_total": 8,
+                "dealer_total": 20,
+                "result": "dealer_wins",
+            }
+        ]
+
+        results_data = [
+            {
+                "unit_id": "the_gambler__rep0005",
+                "strategy_accuracy": "wrong",
+                "difficulty_rating": 3,
+            }
+        ]
+
+        config_yaml = """
+pipeline:
+  steps:
+    - name: deal_cards
+      scope: expression
+    - name: play_hand
+      scope: llm
+    - name: verify_strategy
+      scope: expression
+validation:
+  verify_strategy:
+    rules:
+      - field: strategy_accuracy
+        expr: "strategy_accuracy == 'correct'"
+        level: error
+        message: "Strategy not accurate"
+"""
+
+        run_dir, config_path, results_file, validated_file, failures_file, log_file, input_file = \
+            self._create_run_with_validation(
+                tmp_path, "verify_strategy", ["deal_cards", "play_hand", "verify_strategy"],
+                input_data, results_data, config_yaml
+            )
+
+        valid_count, failed_count = orchestrate.run_validation_pipeline(
+            results_file, validated_file, failures_file,
+            None, config_path, "verify_strategy", log_file, "chunk_000",
+            input_file=input_file
+        )
+
+        assert valid_count == 0
+        assert failed_count == 1
+
+        failure = json.loads(failures_file.read_text().strip())
+
+        # Fields from items (strategy_name) and prior steps (player_card_1, result)
+        assert failure.get("strategy_name") == "The Gambler"
+        assert failure.get("player_card_1") == "5"
+        assert failure.get("result") == "dealer_wins"
+        assert failure.get("player_total") == 8
+
+    def test_validated_output_format_unchanged(self, tmp_path):
+        """Validated output files are unchanged by the failure context merge (no regression)."""
+        input_data = [
+            {
+                "unit_id": "u1",
+                "strategy_name": "The Pro",
+                "upstream_field": "upstream_value",
+            }
+        ]
+
+        results_data = [
+            {
+                "unit_id": "u1",
+                "score": 95,
+                "grade": "A",
+            }
+        ]
+
+        config_yaml = """
+pipeline:
+  steps:
+    - name: step1
+      scope: llm
+    - name: step2
+      scope: llm
+validation:
+  step2:
+    rules:
+      - field: score
+        expr: "score >= 50"
+        level: error
+        message: "Score too low"
+"""
+
+        run_dir, config_path, results_file, validated_file, failures_file, log_file, input_file = \
+            self._create_run_with_validation(
+                tmp_path, "step2", ["step1", "step2"],
+                input_data, results_data, config_yaml
+            )
+
+        valid_count, failed_count = orchestrate.run_validation_pipeline(
+            results_file, validated_file, failures_file,
+            None, config_path, "step2", log_file, "chunk_000",
+            input_file=input_file
+        )
+
+        assert valid_count == 1
+        assert failed_count == 0
+
+        # Validated output should contain merged fields (input + result)
+        valid_record = json.loads(validated_file.read_text().strip())
+        assert valid_record["unit_id"] == "u1"
+        assert valid_record["score"] == 95
+        assert valid_record["strategy_name"] == "The Pro"
+        assert valid_record["upstream_field"] == "upstream_value"

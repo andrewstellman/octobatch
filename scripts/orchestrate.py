@@ -889,7 +889,7 @@ def mark_expression_failures_exhausted(
     return updated
 
 
-def retry_validation_failures(run_dir: Path, manifest: dict, log_file: Path) -> int:
+def retry_validation_failures(run_dir: Path, manifest: dict, log_file: Path, max_retries: int | None = None) -> int:
     """Create retry chunks for units with validation failures (unit-level isolation).
 
     For each step/chunk that has validation failures:
@@ -905,6 +905,8 @@ def retry_validation_failures(run_dir: Path, manifest: dict, log_file: Path) -> 
         run_dir: Path to run directory
         manifest: Loaded manifest dict (will be mutated)
         log_file: Path to log file
+        max_retries: Maximum retry attempts per unit. If provided, units with
+            retry_count >= max_retries are not retried (treated as exhausted).
 
     Returns:
         Total number of validation failures archived.
@@ -1019,6 +1021,9 @@ def retry_validation_failures(run_dir: Path, manifest: dict, log_file: Path) -> 
                 item_retry_count = failure.get("retry_count")
                 if item_retry_count is None:
                     item_retry_count = chunk_retries
+                # Skip units that have exhausted their retries
+                if max_retries is not None and item_retry_count >= max_retries:
+                    continue
                 if unit_id not in units_for_retry:
                     units_for_retry[unit_id] = {
                         "unit": unit_data,
@@ -1514,6 +1519,16 @@ def run_validation_pipeline(
                         # Preserve retry_count from input for retry tracking
                         if "retry_count" in input_data_for_unit:
                             failure["retry_count"] = input_data_for_unit["retry_count"]
+
+                        # Merge accumulated upstream context into top-level failure record.
+                        # This makes fields from items and prior steps (e.g., strategy_name,
+                        # player_card_1) directly accessible in the failure record without
+                        # having to dig into failure["input"]. Failure-specific fields
+                        # (unit_id, errors, failure_stage, etc.) are preserved.
+                        _failure_keys = set(failure.keys())
+                        for ctx_key, ctx_val in input_data_for_unit.items():
+                            if ctx_key not in _failure_keys and not ctx_key.startswith("_"):
+                                failure[ctx_key] = ctx_val
                     # else: keep original input (might already be correct for first step)
 
                 f.write(json.dumps(failure) + '\n')
@@ -2523,9 +2538,17 @@ def tick_run(run_dir: Path, max_retries: int = 5) -> dict:
                     chunk_data["valid"] = valid_count
                     chunk_data["failed"] = failed_count
 
-                    # If zero valid and some failed, mark chunk FAILED — don't advance
-                    if valid_count == 0 and failed_count > 0:
-                        log_message(log_file, "STOP", f"{chunk_name}: Step {step} produced 0 valid units out of {failed_count}. Marking chunk as FAILED.")
+                    # If zero valid units, mark chunk FAILED — don't advance.
+                    # For LLM steps with retries remaining, retry_validation_failures
+                    # (called at end of tick) will create retry chunks.
+                    # For retries exhausted or empty input, mark terminal.
+                    if valid_count == 0:
+                        chunk_retries = chunk_data.get("retries", chunk_data.get("retry_count", 0))
+                        if chunk_retries >= max_retries or failed_count == 0:
+                            log_message(log_file, "STOP", f"{chunk_name}: Step {step} produced 0 valid units (retries exhausted). Marking chunk as terminal FAILED.")
+                            chunk_data["retries"] = max_retries
+                        else:
+                            log_message(log_file, "STOP", f"{chunk_name}: Step {step} produced 0 valid units out of {failed_count}. Marking chunk as FAILED for retry (attempt {chunk_retries + 1}/{max_retries}).")
                         chunk_data["state"] = "FAILED"
                         chunk_data["batch_id"] = None
                         chunk_data["submitted_at"] = None
@@ -2940,6 +2963,14 @@ def tick_run(run_dir: Path, max_retries: int = 5) -> dict:
             log_file, "TICK",
             f"Tokens this tick: {tick_input_tokens} input, {tick_output_tokens} output{retry_suffix}{cost_suffix}"
         )
+
+    # Create retry chunks for any new validation failures produced this tick.
+    # This ensures LLM steps with 0 valid units get retried within the same
+    # watch session (not just at startup).
+    archived = retry_validation_failures(run_dir, manifest, log_file, max_retries=max_retries)
+    if archived > 0:
+        manifest = load_manifest(run_dir)
+        chunks = manifest["chunks"]
 
     # Check if run is now terminal and run-scope steps should execute
     if is_run_terminal(manifest, max_retries):
@@ -3804,7 +3835,7 @@ def watch_run(
     # Scan for validation failures that can be retried (runs at startup, not gated by terminal state)
     manifest = load_manifest(run_dir)
     if manifest:
-        archived = retry_validation_failures(run_dir, manifest, log_file)
+        archived = retry_validation_failures(run_dir, manifest, log_file, max_retries=max_retries)
         if archived > 0:
             manifest = load_manifest(run_dir)
         elif is_run_terminal(manifest, max_retries):
@@ -4492,8 +4523,10 @@ def run_step_realtime(
     chunk_data["input_tokens"] = chunk_data.get("input_tokens", 0) + total_input_tokens
     chunk_data["output_tokens"] = chunk_data.get("output_tokens", 0) + total_output_tokens
 
-    # If zero valid and some failed, mark chunk FAILED — don't advance
-    if valid_count == 0 and failed_count > 0:
+    # If zero valid units, mark chunk FAILED — don't advance.
+    # For LLM steps, run_realtime_retries (called by the main loop) will handle
+    # retrying the failed units. Terminal marking happens after retry exhaustion.
+    if valid_count == 0:
         log_message(log_file, "STOP", f"{chunk_name}: Step {step} produced 0 valid units out of {failed_count}. Marking chunk as FAILED.")
         chunk_data["state"] = "FAILED"
         chunk_data["batch_id"] = None
@@ -4951,7 +4984,7 @@ def realtime_run(
     chunks = manifest["chunks"]
 
     # Scan for validation failures that can be retried (runs at startup, not gated by terminal state)
-    archived = retry_validation_failures(run_dir, manifest, log_file)
+    archived = retry_validation_failures(run_dir, manifest, log_file, max_retries=max_retries)
     if archived > 0:
         # Manifest was mutated by retry_validation_failures — reload
         manifest = load_manifest(run_dir)
@@ -5487,6 +5520,16 @@ def realtime_run(
 
                 retry_round += 1
 
+            # After retries exhaust, mark any FAILED chunks with 0 valid as terminal.
+            # This ensures is_run_terminal() properly detects completion.
+            for chunk_name, chunk_data in chunks.items():
+                if chunk_data.get("state") == "FAILED" and chunk_data.get("valid", 0) == 0:
+                    chunk_retries = chunk_data.get("retries", chunk_data.get("retry_count", 0))
+                    if chunk_retries < max_retries:
+                        chunk_data["retries"] = max_retries
+                        log_message(log_file, "STOP", f"{chunk_name}: 0 valid units after retry exhaustion. Marking terminal.")
+                        save_manifest(run_dir, manifest)
+
             # Break step loop if cost cap reached during retries
             if cost_cap_reached:
                 break
@@ -5515,8 +5558,11 @@ def realtime_run(
                 manifest["completed_run_steps"] = completed_run_steps
                 save_manifest(run_dir, manifest)
 
-    # Run post-processing scripts if configured
-    run_post_process(run_dir, config)
+    # Run post-processing scripts if configured — only when all chunks are terminal.
+    # This ensures post-processing includes results from all retry chunks that
+    # eventually succeeded, not just the first wave of results (Bug 2 v1.0.3).
+    if is_run_terminal(manifest, max_retries):
+        run_post_process(run_dir, config)
 
     # Final summary
     time_str = datetime.now().strftime("%H:%M:%S")

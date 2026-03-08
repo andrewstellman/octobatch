@@ -410,3 +410,81 @@ class TestGetExpressions:
         """Returns empty dict when no expressions configured."""
         assert get_expressions({}) == {}
         assert get_expressions({"processing": {}}) == {}
+
+
+# =============================================================================
+# v1.0.3 Bug 4: Init variable scoping in loops
+# =============================================================================
+
+class TestInitVariableScoping:
+    """Tests for v1.0.3 Bug 4: init expressions referencing upstream context
+    must be available in the expressions block."""
+
+    def test_init_referencing_upstream_context(self):
+        """Init expression referencing upstream context variable resolves correctly."""
+        init = {"_hand": "[card1, card2]"}
+        context = {"card1": "5", "card2": "3"}
+
+        init_results = evaluate_expressions(init, context, seed_or_rng=42)
+        assert init_results["_hand"] == ["5", "3"]
+
+    def test_init_expressions_sequential(self):
+        """Init expressions evaluated sequentially (later init can reference earlier init)."""
+        init = {
+            "_hand": "[card1, card2]",
+            "_total": "sum([int(c) for c in _hand])",
+        }
+        context = {"card1": "5", "card2": "3"}
+
+        init_results = evaluate_expressions(init, context, seed_or_rng=42)
+        assert init_results["_hand"] == ["5", "3"]
+        assert init_results["_total"] == 8
+
+    def test_init_variables_available_in_expressions(self):
+        """Init variables available in expressions block on first loop iteration."""
+        init = {"_hand": "[card1, card2]"}
+        context = {"card1": "5", "card2": "3"}
+
+        # Evaluate init
+        init_results = evaluate_expressions(init, context, seed_or_rng=42)
+        context.update(init_results)
+
+        # Evaluate expressions (simulates what run_expression_step does)
+        expressions = {"_new_total": "sum([int(c) for c in _hand]) + 1"}
+        expr_results = evaluate_expressions(expressions, context, seed_or_rng=42)
+        assert expr_results["_new_total"] == 9
+
+    def test_init_complex_types_from_upstream(self):
+        """Init variables with complex types (lists, dicts built from upstream fields) work."""
+        init = {
+            "_cards": "[card1, card2, card3]",
+            "_values": "[int(c) if c.isdigit() else 10 for c in _cards]",
+        }
+        context = {"card1": "5", "card2": "K", "card3": "3"}
+
+        results = evaluate_expressions(init, context, seed_or_rng=42)
+        assert results["_cards"] == ["5", "K", "3"]
+        assert results["_values"] == [5, 10, 3]
+
+    def test_drunken_sailor_init_unchanged(self):
+        """Existing Drunken Sailor init behavior unchanged (regression test)."""
+        # Drunken Sailor uses: init: { position: "start_position" }
+        init = {"position": "start_position"}
+        context = {"start_position": 5}
+
+        results = evaluate_expressions(init, context, seed_or_rng=42)
+        assert results["position"] == 5
+
+    def test_system_fields_not_leaked_to_expressions(self):
+        """System fields (_metadata, _raw_text) are not available in expressions."""
+        expressions = {"result": "1 + 1"}
+        context = {
+            "card1": "5",
+            "_metadata": {"some": "data"},
+            "_raw_text": "raw response",
+            "_repetition_seed": 12345,
+        }
+
+        # Should not fail even though system fields are in context
+        results = evaluate_expressions(expressions, context, seed_or_rng=42)
+        assert results["result"] == 2
