@@ -51,6 +51,7 @@ from orchestrate import (
     retry_failures_run,
     parse_duration,
     format_watch_progress,
+    compute_watch_deltas,
     format_step_provider_tag,
     _run_gzip_post_process,
     run_post_process,
@@ -5525,3 +5526,61 @@ validation:
         assert valid_record["score"] == 95
         assert valid_record["strategy_name"] == "The Pro"
         assert valid_record["upstream_field"] == "upstream_value"
+
+
+# =============================================================================
+# Watch delta and heartbeat tests (Bug 7)
+# =============================================================================
+
+class TestWatchDeltas:
+    """Tests for compute_watch_deltas() delta calculation."""
+
+    def test_delta_identifies_changes(self):
+        """Delta correctly identifies changes between two state snapshots."""
+        pipeline = ["step1", "step2"]
+        prev = {
+            "step1": {"valid": 5, "failed": 1},
+            "step2": {"valid": 0, "failed": 0},
+        }
+        status = {
+            "steps": {
+                "step1": {"units": {"valid": 8, "failed": 2}},
+                "step2": {"units": {"valid": 3, "failed": 0}},
+            }
+        }
+
+        deltas, new_counts = compute_watch_deltas(status, pipeline, prev)
+
+        assert len(deltas) == 2
+        assert "step1: +3 valid, +1 failed" in deltas
+        assert "step2: +3 valid" in deltas
+        assert new_counts["step1"] == {"valid": 8, "failed": 2}
+        assert new_counts["step2"] == {"valid": 3, "failed": 0}
+
+    def test_no_delta_when_unchanged(self):
+        """No delta line when state hasn't changed."""
+        pipeline = ["step1"]
+        prev = {"step1": {"valid": 5, "failed": 1}}
+        status = {
+            "steps": {
+                "step1": {"units": {"valid": 5, "failed": 1}},
+            }
+        }
+
+        deltas, new_counts = compute_watch_deltas(status, pipeline, prev)
+
+        assert deltas == []
+
+    def test_delta_from_empty_prev(self):
+        """First tick computes deltas from zero baseline."""
+        pipeline = ["step1"]
+        status = {
+            "steps": {
+                "step1": {"units": {"valid": 4, "failed": 0}},
+            }
+        }
+
+        deltas, new_counts = compute_watch_deltas(status, pipeline, {})
+
+        assert len(deltas) == 1
+        assert "+4 valid" in deltas[0]

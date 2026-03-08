@@ -3789,6 +3789,50 @@ def format_watch_progress(status: dict, pipeline: list[str]) -> str:
     return " | ".join(parts)
 
 
+def compute_watch_deltas(
+    status: dict,
+    pipeline: list[str],
+    prev_step_counts: dict[str, dict]
+) -> tuple[list[str], dict[str, dict]]:
+    """
+    Compute delta summaries between current and previous watch state.
+
+    Args:
+        status: Status dict from tick_run()
+        pipeline: List of pipeline step names
+        prev_step_counts: Previous {step_name: {"valid": N, "failed": N}}
+
+    Returns:
+        (delta_messages, updated_prev_counts) tuple.
+        delta_messages is a list of strings like "step1: +3 valid, +1 failed".
+        updated_prev_counts replaces prev_step_counts for next call.
+    """
+    steps_info = status.get("steps", {})
+    deltas = []
+    new_counts = dict(prev_step_counts)
+
+    for step_name in pipeline:
+        if step_name not in steps_info:
+            continue
+        step_data = steps_info[step_name]
+        units_data = step_data.get("units", {})
+        cur_valid = units_data.get("valid", 0)
+        cur_failed = units_data.get("failed", 0)
+        prev = prev_step_counts.get(step_name, {"valid": 0, "failed": 0})
+        dv = cur_valid - prev["valid"]
+        df = cur_failed - prev["failed"]
+        if dv > 0 or df > 0:
+            parts = []
+            if dv > 0:
+                parts.append(f"+{dv} valid")
+            if df > 0:
+                parts.append(f"+{df} failed")
+            deltas.append(f"{step_name}: {', '.join(parts)}")
+        new_counts[step_name] = {"valid": cur_valid, "failed": cur_failed}
+
+    return deltas, new_counts
+
+
 def watch_run(
     run_dir: Path,
     interval: int = 5,
@@ -3926,6 +3970,9 @@ def _watch_loop(
 
     start_time = time.time()
     tick_count = 0
+    prev_step_counts = {}  # {step_name: {"valid": N, "failed": N}} for delta computation
+    last_tick_time = 0.0  # For heartbeat timing
+    heartbeat_interval = 30  # Seconds between heartbeat lines
 
     while True:
         # Check for interruption
@@ -3948,6 +3995,33 @@ def _watch_loop(
         time_str = now.strftime("%H:%M:%S")
         progress = format_watch_progress(status, pipeline)
         print(f"[{time_str}] {progress}")
+
+        # Compute and print delta summaries for steps that changed
+        steps_info = status.get("steps", {})
+        delta_parts = []
+        for step_name in pipeline:
+            if step_name not in steps_info:
+                continue
+            step_data = steps_info[step_name]
+            units_data = step_data.get("units", {})
+            cur_valid = units_data.get("valid", 0)
+            cur_failed = units_data.get("failed", 0)
+            prev = prev_step_counts.get(step_name, {"valid": 0, "failed": 0})
+            dv = cur_valid - prev["valid"]
+            df = cur_failed - prev["failed"]
+            if dv > 0 or df > 0:
+                parts = []
+                if dv > 0:
+                    parts.append(f"+{dv} valid")
+                if df > 0:
+                    parts.append(f"+{df} failed")
+                delta_parts.append(f"{step_name}: {', '.join(parts)}")
+            prev_step_counts[step_name] = {"valid": cur_valid, "failed": cur_failed}
+
+        if delta_parts:
+            print(f"[{time_str}]   Delta: {' | '.join(delta_parts)}")
+
+        last_tick_time = time.time()
 
         # Check cost limit
         cost_info = status.get("cost", {})
@@ -4028,8 +4102,21 @@ def _watch_loop(
         if interrupted_flag():
             return 130
 
-        # Wait for next tick
-        time.sleep(interval)
+        # Wait for next tick, emitting heartbeat lines during long intervals
+        sleep_start = time.time()
+        while True:
+            remaining = interval - (time.time() - sleep_start)
+            if remaining <= 0:
+                break
+            if interrupted_flag():
+                return 130
+            # Sleep in short increments, emitting heartbeat every heartbeat_interval seconds
+            sleep_chunk = min(remaining, 1.0)
+            time.sleep(sleep_chunk)
+            since_tick = time.time() - last_tick_time
+            if since_tick >= heartbeat_interval and int(since_tick) % heartbeat_interval < 2:
+                hb_time = datetime.now().strftime("%H:%M:%S")
+                print(f"[{hb_time}]   Heartbeat: alive, waiting for batch results ({int(since_tick)}s since last tick)")
 
 
 # =============================================================================

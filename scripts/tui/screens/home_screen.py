@@ -28,6 +28,7 @@ from ..utils import (
     scan_pipelines,
     calculate_dashboard_stats,
 )
+from ..utils.formatting import compute_eta_seconds, format_eta
 from ..utils.runs import (
     get_run_process_status,
     get_enhanced_run_status,
@@ -888,6 +889,7 @@ class HomeScreen(Screen):
         """Compute ETA for a running run from summary timestamps.
 
         Returns a formatted string like '~12m', '~1h 30m', or '—' for non-running runs.
+        Uses shared compute_eta_seconds/format_eta from formatting utils.
         """
         status = run.get("status", "")
         if status not in ("running", "active"):
@@ -913,22 +915,9 @@ class HomeScreen(Screen):
                 started_dt = started_dt.replace(tzinfo=timezone.utc)
 
             now = datetime.now(timezone.utc)
-            elapsed = now - started_dt
-            if elapsed.total_seconds() <= 0:
-                return "—"
+            elapsed = (now - started_dt).total_seconds()
 
-            eta_seconds = elapsed.total_seconds() * (100 - progress) / progress
-            if eta_seconds < 60:
-                return "~<1m"
-            elif eta_seconds < 3600:
-                mins = int(eta_seconds / 60)
-                return f"~{mins}m"
-            else:
-                hours = int(eta_seconds / 3600)
-                mins = int((eta_seconds % 3600) / 60)
-                if mins > 0:
-                    return f"~{hours}h {mins}m"
-                return f"~{hours}h"
+            return format_eta(compute_eta_seconds(elapsed, progress))
         except (ValueError, AttributeError, TypeError):
             return "—"
 

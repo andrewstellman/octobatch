@@ -108,22 +108,20 @@ def _verify_step(
     for chunk_name in sorted(chunks.keys()):
         chunk_dir = run_dir / "chunks" / chunk_name
 
-        # Scan validated file
+        # Scan validated file (supports both .jsonl and .jsonl.gz)
         validated_file = chunk_dir / f"{step_name}_validated.jsonl"
-        if validated_file.exists():
-            for record in load_jsonl(validated_file):
-                uid = record.get("unit_id")
-                if uid:
-                    valid_count_with_dupes += 1
-                    valid_ids.add(uid)
+        for record in load_jsonl(validated_file):
+            uid = record.get("unit_id")
+            if uid:
+                valid_count_with_dupes += 1
+                valid_ids.add(uid)
 
         # Scan failures file
         failures_file = chunk_dir / f"{step_name}_failures.jsonl"
-        if failures_file.exists():
-            for record in load_jsonl(failures_file):
-                uid = record.get("unit_id")
-                if uid:
-                    failed_ids.add(uid)
+        for record in load_jsonl(failures_file):
+            uid = record.get("unit_id")
+            if uid:
+                failed_ids.add(uid)
 
     # Units accounted for = valid union failed
     accounted_ids = valid_ids | failed_ids
@@ -225,11 +223,10 @@ def repair_run(run_dir: Path) -> dict:
             for chunk_name in sorted(chunks.keys()):
                 chunk_dir = run_dir / "chunks" / chunk_name
                 validated_file = chunk_dir / f"{prev_step}_validated.jsonl"
-                if validated_file.exists():
-                    for record in load_jsonl(validated_file):
-                        uid = record.get("unit_id")
-                        if uid and uid in missing_ids:
-                            unit_data[uid] = record
+                for record in load_jsonl(validated_file):
+                    uid = record.get("unit_id")
+                    if uid and uid in missing_ids:
+                        unit_data[uid] = record
 
         if not unit_data:
             continue

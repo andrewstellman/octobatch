@@ -39,6 +39,7 @@ from .common import (
     set_os_terminal_title,
     _log,
 )
+from ..utils.formatting import compute_eta_seconds, format_eta
 from ..utils.runs import get_run_process_status, has_recent_errors, get_batch_timing, get_process_health
 
 
@@ -2097,10 +2098,10 @@ Passed:        {passed}
             if elapsed_str and progress_ratio > 0.01:
                 elapsed_seconds = self._parse_elapsed_time(elapsed_str)
                 if elapsed_seconds and elapsed_seconds > 0:
-                    projected_seconds = elapsed_seconds / progress_ratio
-                    remaining_seconds = projected_seconds - elapsed_seconds
-                    if remaining_seconds > 0:
-                        eta = self._format_eta(remaining_seconds)
+                    progress_pct = progress_ratio * 100
+                    remaining = compute_eta_seconds(elapsed_seconds, progress_pct)
+                    if remaining is not None:
+                        eta = format_eta(remaining)
 
             return {
                 "projected_cost": projected_cost,
@@ -2130,19 +2131,8 @@ Passed:        {passed}
         return None
 
     def _format_eta(self, seconds: float) -> str:
-        """Format ETA in human-readable form."""
-        seconds = int(seconds)
-        if seconds < 60:
-            return f"~{seconds}s"
-        elif seconds < 3600:
-            mins = seconds // 60
-            return f"~{mins}m"
-        else:
-            hours = seconds // 3600
-            mins = (seconds % 3600) // 60
-            if mins > 0:
-                return f"~{hours}h {mins}m"
-            return f"~{hours}h"
+        """Format ETA in human-readable form. Delegates to shared format_eta."""
+        return format_eta(seconds)
 
     def _calculate_cost_from_manifest(self) -> tuple[float, int]:
         """Calculate cost from manifest token counts."""

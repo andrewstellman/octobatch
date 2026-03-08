@@ -196,3 +196,47 @@ def pad_string(s: str, width: int, align: str = "left") -> str:
         return s.center(width)
     else:  # left
         return s.ljust(width)
+
+
+def compute_eta_seconds(elapsed_seconds: float, progress: float) -> float | None:
+    """
+    Compute estimated time remaining in seconds.
+
+    Uses linear interpolation: remaining = elapsed * (100 - progress) / progress.
+
+    Args:
+        elapsed_seconds: Time elapsed since run started, in seconds
+        progress: Progress percentage (0-100)
+
+    Returns:
+        Estimated remaining seconds, or None if ETA cannot be computed
+    """
+    if elapsed_seconds <= 0 or progress <= 0 or progress >= 100:
+        return None
+    return elapsed_seconds * (100 - progress) / progress
+
+
+def format_eta(seconds: float | None) -> str:
+    """
+    Format ETA seconds as a human-readable string.
+
+    Args:
+        seconds: Remaining seconds, or None
+
+    Returns:
+        Formatted string like '~<1m', '~12m', '~1h 30m', or '—'
+    """
+    if seconds is None or seconds <= 0:
+        return "—"
+    seconds = int(seconds)
+    if seconds < 60:
+        return "~<1m"
+    elif seconds < 3600:
+        mins = seconds // 60
+        return f"~{mins}m"
+    else:
+        hours = seconds // 3600
+        mins = (seconds % 3600) // 60
+        if mins > 0:
+            return f"~{hours}h {mins}m"
+        return f"~{hours}h"

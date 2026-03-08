@@ -1294,3 +1294,128 @@ class TestPipelineChaining:
 
         assert result["integrity"] == "WARN"
         assert result["total_missing"] == 2
+
+
+# =============================================================================
+# Gzip support tests (Bug 4a)
+# =============================================================================
+
+class TestGzipSupport:
+    """Tests verifying that verify_run and repair_run handle .jsonl.gz files."""
+
+    def test_verify_reads_gzipped_validated_files(self, tmp_path):
+        """verify_run correctly reads gzipped validated files."""
+        import gzip
+
+        run_dir = tmp_path / "gz_verify"
+        run_dir.mkdir()
+
+        manifest = {
+            "pipeline": ["step1"],
+            "chunks": {
+                "chunk_000": {
+                    "state": "VALIDATED", "items": 3, "valid": 2,
+                    "failed": 1, "retries": 0, "input_tokens": 0, "output_tokens": 0,
+                }
+            },
+            "metadata": {},
+            "created": "2024-01-01T00:00:00Z",
+            "updated": "2024-01-01T00:00:00Z",
+        }
+        write_manifest(run_dir, manifest)
+
+        chunk_dir = run_dir / "chunks" / "chunk_000"
+        write_jsonl(chunk_dir / "units.jsonl", [
+            make_unit("a"), make_unit("b"), make_unit("c"),
+        ])
+
+        # Write validated file as gzipped (simulating post-processing compression)
+        gz_path = chunk_dir / "step1_validated.jsonl.gz"
+        gz_path.parent.mkdir(parents=True, exist_ok=True)
+        with gzip.open(gz_path, "wt", encoding="utf-8") as f:
+            for record in [make_unit("a"), make_unit("b")]:
+                f.write(json.dumps(record) + "\n")
+
+        # Write failures as plain jsonl
+        write_jsonl(chunk_dir / "step1_failures.jsonl", [make_unit("c")])
+
+        result = verify_run(run_dir)
+
+        assert result["steps"][0]["valid"] == 2
+        assert result["steps"][0]["failed"] == 1
+        assert result["steps"][0]["missing"] == 0
+        assert result["integrity"] == "OK"
+
+    def test_verify_still_works_with_uncompressed_files(self, tmp_path):
+        """Regression: verify_run still works with plain .jsonl files."""
+        run_dir = tmp_path / "plain_verify"
+        run_dir.mkdir()
+
+        manifest = {
+            "pipeline": ["step1"],
+            "chunks": {
+                "chunk_000": {
+                    "state": "VALIDATED", "items": 2, "valid": 2,
+                    "failed": 0, "retries": 0, "input_tokens": 0, "output_tokens": 0,
+                }
+            },
+            "metadata": {},
+            "created": "2024-01-01T00:00:00Z",
+            "updated": "2024-01-01T00:00:00Z",
+        }
+        write_manifest(run_dir, manifest)
+
+        chunk_dir = run_dir / "chunks" / "chunk_000"
+        write_jsonl(chunk_dir / "units.jsonl", [make_unit("a"), make_unit("b")])
+        write_jsonl(chunk_dir / "step1_validated.jsonl", [make_unit("a"), make_unit("b")])
+
+        result = verify_run(run_dir)
+
+        assert result["steps"][0]["valid"] == 2
+        assert result["steps"][0]["missing"] == 0
+        assert result["integrity"] == "OK"
+
+    def test_repair_reads_gzipped_prev_step_validated(self, tmp_path):
+        """repair_run finds unit data from gzipped previous step validated files."""
+        import gzip
+
+        run_dir = tmp_path / "gz_repair"
+        run_dir.mkdir()
+
+        manifest = {
+            "pipeline": ["step1", "step2"],
+            "chunks": {
+                "chunk_000": {
+                    "state": "VALIDATED", "items": 3, "valid": 2,
+                    "failed": 0, "retries": 0, "input_tokens": 0, "output_tokens": 0,
+                }
+            },
+            "metadata": {},
+            "status": "complete",
+            "created": "2024-01-01T00:00:00Z",
+            "updated": "2024-01-01T00:00:00Z",
+        }
+        write_manifest(run_dir, manifest)
+
+        chunk_dir = run_dir / "chunks" / "chunk_000"
+        write_jsonl(chunk_dir / "units.jsonl", [
+            make_unit("a"), make_unit("b"), make_unit("c"),
+        ])
+
+        # step1 validated is gzipped (post-processing compressed it)
+        gz_path = chunk_dir / "step1_validated.jsonl.gz"
+        gz_path.parent.mkdir(parents=True, exist_ok=True)
+        with gzip.open(gz_path, "wt", encoding="utf-8") as f:
+            for record in [make_unit("a"), make_unit("b"), make_unit("c")]:
+                f.write(json.dumps(record) + "\n")
+
+        # step2 only has "a" valid — "b" and "c" are missing
+        write_jsonl(chunk_dir / "step2_validated.jsonl", [make_unit("a")])
+
+        result = repair_run(run_dir)
+
+        assert result["missing_count"] == 2
+        assert len(result["chunks_created"]) == 1
+        created = result["chunks_created"][0]
+        assert created["step"] == "step2"
+        assert created["unit_count"] == 2
