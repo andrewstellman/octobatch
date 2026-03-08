@@ -31,3 +31,14 @@ tests/results/
 .idea/
 .claude/
 
+# Pipeline configs - only track the three demo pipelines and docs
+pipelines/*
+!pipelines/Blackjack/
+!pipelines/DrunkenSailor/
+!pipelines/NPCDialog/
+!pipelines/*.md
+
+# Miscellaneous
+_working/
+tmp/
+
