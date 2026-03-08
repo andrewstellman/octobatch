@@ -40,7 +40,13 @@ from .common import (
     _log,
 )
 from ..utils.formatting import compute_eta_seconds, format_eta
-from ..utils.runs import get_run_process_status, has_recent_errors, get_batch_timing, get_process_health
+from ..utils.runs import (
+    get_run_process_status,
+    has_recent_errors,
+    get_batch_timing,
+    get_process_health,
+    get_run_progress,
+)
 
 
 SPINNER_FRAMES = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"]
@@ -2074,18 +2080,12 @@ Passed:        {passed}
                 pct = get_run_progress(manifest)
                 return {"progress_percent": pct, "manifest_status": "failed"}
 
-            # Get progress from chunks
-            chunks = manifest.get("chunks", {})
-            total_units = sum(c.get("items", 0) for c in chunks.values())
-            completed_units = sum(
-                c.get("valid", 0) + c.get("failed", 0)
-                for c in chunks.values()
-            )
-
-            if total_units == 0 or completed_units == 0:
+            # Use the shared step-aware progress calculation (same source as HomeScreen)
+            # so ETA remains consistent across screens for multi-step pipelines.
+            progress_percent = get_run_progress(manifest)
+            if progress_percent <= 0:
                 return {}
-
-            progress_ratio = completed_units / total_units
+            progress_ratio = progress_percent / 100.0
 
             # Project cost
             projected_cost = None
@@ -2106,7 +2106,7 @@ Passed:        {passed}
             return {
                 "projected_cost": projected_cost,
                 "eta": eta,
-                "progress_percent": progress_ratio * 100,
+                "progress_percent": progress_percent,
                 "manifest_status": manifest_status,
             }
         except Exception:

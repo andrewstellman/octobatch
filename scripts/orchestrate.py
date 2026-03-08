@@ -3972,6 +3972,7 @@ def _watch_loop(
     tick_count = 0
     prev_step_counts = {}  # {step_name: {"valid": N, "failed": N}} for delta computation
     last_tick_time = 0.0  # For heartbeat timing
+    last_heartbeat_bucket = -1
     heartbeat_interval = 30  # Seconds between heartbeat lines
 
     while True:
@@ -3997,31 +3998,13 @@ def _watch_loop(
         print(f"[{time_str}] {progress}")
 
         # Compute and print delta summaries for steps that changed
-        steps_info = status.get("steps", {})
-        delta_parts = []
-        for step_name in pipeline:
-            if step_name not in steps_info:
-                continue
-            step_data = steps_info[step_name]
-            units_data = step_data.get("units", {})
-            cur_valid = units_data.get("valid", 0)
-            cur_failed = units_data.get("failed", 0)
-            prev = prev_step_counts.get(step_name, {"valid": 0, "failed": 0})
-            dv = cur_valid - prev["valid"]
-            df = cur_failed - prev["failed"]
-            if dv > 0 or df > 0:
-                parts = []
-                if dv > 0:
-                    parts.append(f"+{dv} valid")
-                if df > 0:
-                    parts.append(f"+{df} failed")
-                delta_parts.append(f"{step_name}: {', '.join(parts)}")
-            prev_step_counts[step_name] = {"valid": cur_valid, "failed": cur_failed}
+        delta_parts, prev_step_counts = compute_watch_deltas(status, pipeline, prev_step_counts)
 
         if delta_parts:
             print(f"[{time_str}]   Delta: {' | '.join(delta_parts)}")
 
         last_tick_time = time.time()
+        last_heartbeat_bucket = -1
 
         # Check cost limit
         cost_info = status.get("cost", {})
@@ -4114,9 +4097,14 @@ def _watch_loop(
             sleep_chunk = min(remaining, 1.0)
             time.sleep(sleep_chunk)
             since_tick = time.time() - last_tick_time
-            if since_tick >= heartbeat_interval and int(since_tick) % heartbeat_interval < 2:
+            if since_tick >= heartbeat_interval:
+                heartbeat_bucket = int(since_tick // heartbeat_interval)
+            else:
+                heartbeat_bucket = 0
+            if since_tick >= heartbeat_interval and heartbeat_bucket > last_heartbeat_bucket:
                 hb_time = datetime.now().strftime("%H:%M:%S")
                 print(f"[{hb_time}]   Heartbeat: alive, waiting for batch results ({int(since_tick)}s since last tick)")
+                last_heartbeat_bucket = heartbeat_bucket
 
 
 # =============================================================================
