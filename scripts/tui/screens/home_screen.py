@@ -1649,7 +1649,7 @@ class HomeScreen(Screen):
         self.app.notify("Run restarted")
 
     def action_name_run(self) -> None:
-        """Set or edit display name for a run (B key)."""
+        """Set or edit display name for a run (W key)."""
         run = self._get_selected_run()
         if not run:
             self.app.notify("No run selected", severity="warning")

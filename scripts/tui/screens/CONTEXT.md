@@ -37,10 +37,14 @@ This directory contains the main screen classes for the Octobatch TUI. Each scre
 | P/p | pause_run | Pause running orchestrator (sends SIGINT) |
 | R | resume_run | Resume detached/paused run |
 | K/k | kill_run | Kill process (if alive) or mark zombie as failed |
+| D/d | delete_run | Delete selected run (hidden) |
 | X/x | archive_run | Archive terminal run (moves to runs/_archive/) |
 | H/h | toggle_archived | Show/hide archived runs |
 | L/l | show_pipelines | Open ConfigListScreen |
-| r | refresh | Reload data (hidden - auto-refresh handles this) |
+| W/w | name_run | Set display name for a run |
+| C/c | compare_runs | Compare selected runs side by side |
+| Space | toggle_select | Multi-select toggle for run comparison |
+| Ctrl+R/F5 | refresh | Reload data (hidden - auto-refresh handles this) |
 | ↑/↓ | cursor_up/down | Navigate runs list |
 
 **Async Startup & Auto-Polling:**
@@ -114,16 +118,22 @@ Expression steps (`scope: expression`) appear in the pipeline visualization like
 |-----|--------|-------------|
 | Q/q | quit | Exit application |
 | L/l | show_log | Open LogModal |
+| A/a | view_artifacts | Open artifact viewer modal |
 | C/c | show_config | Open ConfigListScreen |
 | I/i | process_info | Open ProcessInfoScreen for this run |
 | V/v | toggle_view | Toggle between Chunk View and Unit View |
 | X/x | archive_run | Archive this run (terminal runs only) |
+| G/g | pipeline_report | Pipeline validation funnel report modal |
+| M/m | mode_switch | Schedule batch↔realtime mode switch |
+| P/p | intermediate_results | View validated output for selected step |
+| T/t | troubleshoot | AI troubleshooting (renders failure context, sends to LLM) |
+| D/d | generate_diagnostic | Open Diagnostics Screen for failure analysis |
+| R/r | retry_failures | Retry validation failures for selected step |
 | Escape | go_back | Return to HomeScreen |
 | Enter | select_item | Show unit detail (unit view only) |
 | ←/→ | prev/next_step | Navigate pipeline steps |
 | ↑/↓ | nav_up/down | Navigate within panel |
 | F/f | cycle_status_filter | Filter: All → Valid → Failed (unit view) |
-| T/t | cycle_step_filter | Filter by step (unit view) |
 | S/s | cycle_sort | Sort: unit_id → status → step (unit view) |
 
 **Pipeline Funnel Display:**
@@ -180,7 +190,6 @@ Failed:        2     (red — not retryable)
 - `active_focus`: "pipeline" or "detail"
 - `current_view`: "unit" (default) or "chunk"
 - `status_filter`: "all", "valid", or "failed"
-- `step_filter`: "all" or specific step name
 - `sort_by`: "unit_id", "status", or "step"
 
 **Toggle View Feature:**
@@ -240,11 +249,12 @@ In Unit View, the right stats panel shows filter summary instead of chunk detail
 - `make_progress_bar()`: Create ASCII progress bar
 - `set_os_terminal_title(title)`: Write xterm OSC title escape sequence to `/dev/tty` (bypasses Textual's stdout capture); deduplicated via module-level `_last_os_title` cache
 
-### modals.py (Detail Modals)
-**LogModal:** Display RUN_LOG.txt with save/copy options
-**FailureDetailModal:** Show failure details with errors
-**DetailModal (base):** Generic modal for content display
+### modals.py (Shared Modals)
 **ArchiveConfirmModal:** Confirmation dialog for archiving runs; triggered by `X` key on home screen and detail screen
+**ConfirmModal:** Generic yes/no confirmation modal (used by mode switch, etc.)
+**TextInputModal:** Text input modal (used by named runs, etc.)
+
+Note: `LogModal`, `DetailModal`, `FailureDetailModal`, `ArtifactModal` are in `scripts/tui/modals.py` (package level, not screens directory).
 
 ### UnitDetailModal (in main_screen.py)
 **Purpose:** Interactive JSON tree view for unit data with multiple view modes.
@@ -274,6 +284,36 @@ In Unit View, the right stats panel shows filter summary instead of chunk detail
 - **Tree (T)**: Shows input/context data as expandable tree. Default view.
 - **Raw (R)**: Shows full JSON with line numbers. Useful for copying.
 - **LLM Response (L)**: Shows `raw_response` field - the actual LLM output that failed validation. Only available for failed units with captured raw_response.
+
+### diagnostics_screen.py (DiagnosticsScreen - Interactive Failure Analysis)
+**Purpose:** Step-by-step failure analysis screen with revalidation support. Accessed via `D` key from MainScreen.
+
+**Key Bindings:**
+| Key | Action | Description |
+|-----|--------|-------------|
+| Escape | go_back | Return to MainScreen |
+| Q/q | quit_app | Exit application |
+| ←/→ | step_prev/step_next | Navigate pipeline steps |
+| V/v | revalidate | Re-run validation on failures for current step |
+| S/s | save_diagnostic | Save diagnostic report to file |
+| C/c | copy_diagnostic | Copy diagnostic to clipboard |
+
+### TroubleshootPromptModal (in main_screen.py)
+**Purpose:** AI-assisted troubleshooting. Renders failure context into a Jinja2 template, lets user edit the prompt, select a provider/model, and send via realtime API.
+
+**Features:**
+- Full-screen modal with prompt TextArea editor
+- Provider/model selector (auto-defaults to cheapest configured option)
+- Copy prompt to clipboard (C key)
+- Send or Cancel buttons
+
+**Template:** Uses `scripts/templates/troubleshoot.jinja2` with failure summary, top errors, sample failures, and config snapshot.
+
+**Key Bindings:**
+| Key | Action | Description |
+|-----|--------|-------------|
+| Escape | cancel | Close modal |
+| C/c | copy | Copy prompt to clipboard |
 
 ### splash_screen.py (SplashScreen - Otto Welcome Overlay)
 **Purpose:** Non-blocking animated Otto splash overlay on app startup.
@@ -386,17 +426,17 @@ HomeScreen
     │
     ├── Enter → MainScreen(run_data)
     │   │
-    │   ├── Chunk View (default)
-    │   │   ├── _chunks_for_step (filtered by selected step)
-    │   │   ├── _get_process_status() → shows in Run Stats panel
-    │   │   └── ↑↓ to navigate chunks
-    │   │
-    │   ├── V → Unit View
+    │   ├── Unit View (default)
     │   │   ├── _load_all_units() → _all_units
     │   │   │   ├── Scan *_validated.jsonl → valid units
     │   │   │   └── Scan *_failures.jsonl → failed units
-    │   │   ├── F/T/S → Filter and sort
+    │   │   ├── F/S → Filter and sort
     │   │   └── Enter → UnitDetailModal(unit)
+    │   │
+    │   ├── V → Chunk View
+    │   │   ├── _chunks_for_step (filtered by selected step)
+    │   │   ├── _get_process_status() → shows in Run Stats panel
+    │   │   └── ↑↓ to navigate chunks
     │   │
     │   └── I → ProcessInfoScreen(run_dir)
     │       │
@@ -495,7 +535,7 @@ self._spinner_timer = self.set_interval(0.25, self._animate_spinner)
 ## 6. Recent Changes
 
 ### Dynamic Terminal Title & Version Display (Latest)
-- **Dynamic terminal title via `self.app.title`**: Home screen shows run counts (e.g. "Octobatch v1.0.0 – Main Screen (10 runs)"), detail screen shows pipeline name and status (e.g. "Octobatch v1.0.0 – Blackjack pipeline (complete)"). OS terminal window title set via `set_os_terminal_title()` in `common.py` which writes xterm OSC escape sequence to `/dev/tty`, bypassing Textual's stdout capture. Title deduplication via `_last_os_title` cache prevents flicker from background polls. `self.app.title` (Header widget) guarded by `self.app.screen is self` to prevent stale screen updates; OSC write is unguarded but cache-protected. Detail screen uses enhanced process-aware status (e.g. "process lost" instead of raw manifest "running").
+- **Dynamic terminal title via `self.app.title`**: Home screen shows run counts (e.g. "Octobatch v1.1.0 – Main Screen (10 runs)"), detail screen shows pipeline name and status (e.g. "Octobatch v1.1.0 – Blackjack pipeline (complete)"). OS terminal window title set via `set_os_terminal_title()` in `common.py` which writes xterm OSC escape sequence to `/dev/tty`, bypassing Textual's stdout capture. Title deduplication via `_last_os_title` cache prevents flicker from background polls. `self.app.title` (Header widget) guarded by `self.app.screen is self` to prevent stale screen updates; OSC write is unguarded but cache-protected. Detail screen uses enhanced process-aware status (e.g. "process lost" instead of raw manifest "running").
 - **Version displayed in TUI header from `scripts/version.py`**: Single source of truth `__version__` in `scripts/version.py`, imported by both screens' `_render_header()` methods. Shown as `[bold]Octobatch[/] [dim]v{__version__}[/]` in the visual header bar. Also used in `--version` CLI flag and `--dump` text output.
 
 ### Archive Feature
@@ -543,7 +583,7 @@ self._spinner_timer = self.set_interval(0.25, self._animate_spinner)
 - **Dual-highlight fix**: `_render_recent_runs()` enforces inactive state on refresh
 
 ### Auto-Polling & Pause
-- **HomeScreen Auto-Polling**: Polls every 3 seconds for manifest changes, auto-refreshes UI
+- **HomeScreen Auto-Polling**: Polls every 2.5 seconds for manifest changes, auto-refreshes UI
 - **Pause Action**: `P` key sends SIGINT to gracefully pause running orchestrator
 - **Step Progress Display**: Active run cards show current step and progress (e.g., "generate_dialog 3/9")
 - **Batch Timing Display**: Active run cards show "Last: Xs | Next: Ys" for batch mode runs
@@ -598,7 +638,7 @@ New status indicators:
 MainScreen now supports toggling between Chunk View and Unit View:
 - Press `V` to toggle views
 - Unit View shows all units from all chunks in a flat list
-- Filter by status (F), step (T), or change sort order (S)
+- Filter by status (F) or change sort order (S)
 - Enter on a unit opens UnitDetailModal with full JSON
 
 ### Removed ResultsInspectorScreen
@@ -649,8 +689,7 @@ Active Runs section uses `mount(active_section, before=recent_section)` to ensur
 **Threaded unit loading (keyboard lag fix)**: `_load_all_units()` now runs in a background thread instead of synchronously on the Textual event loop. Previously, `_do_refresh()` ran every 0.5s and synchronously loaded ~2400 JSONL entries for running runs, starving the event loop and causing keystrokes to pile up. Now: refresh timer is 2.0s (lightweight — pipeline/stats only), unit refresh is a separate 5.0s timer that triggers a background thread. The UI shows "Loading..." while units load asynchronously.
 
 ### Known Limitations
-- Delete run not implemented
-- No auto-refresh (manual r key required)
+- Delete run not implemented (D key exists but shows "not yet implemented" notification)
 - Process management requires `psutil` package
 
 ### Technical Debt
@@ -679,10 +718,10 @@ python -c "from scripts.tui import run_tui; run_tui()"
 1. **Navigation**: Arrows move selection, Enter drills down, Escape goes back
 2. **New Run**: Form validation, subprocess launch, auto-navigation
 3. **Resume**: Only enabled for detached/paused, launches correct mode
-4. **Refresh**: r key reloads all data and updates display
+4. **Refresh**: Ctrl+R or F5 reloads all data and updates display
 5. **Layout**: Active section always above Recent section
 6. **Toggle View**: V switches between Chunk and Unit view
-7. **Unit Filtering**: F cycles status, T cycles step, S cycles sort
+7. **Unit Filtering**: F cycles status, S cycles sort
 8. **Unit Detail**: Enter on unit in Unit View opens detail modal
 9. **Kill Process**: K kills stuck/zombie processes, status updates after refresh
 10. **Process Discovery**: Orphaned processes (no PID file) are discovered and can be killed

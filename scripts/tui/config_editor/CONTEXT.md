@@ -293,7 +293,7 @@ Arrow keys now switch between panels:
 ### Manual Testing
 ```bash
 # Open pipeline editor from HomeScreen
-# Press P to open ConfigListScreen
+# Press L to open ConfigListScreen
 
 # Test New Pipeline
 # Press N, enter name, verify directory created

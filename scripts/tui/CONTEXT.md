@@ -18,8 +18,9 @@ This package provides a Terminal User Interface (TUI) for the Octobatch batch pr
 tui/
 ├── app.py              # Main Textual app (pushes SplashScreen on mount)
 ├── data.py             # Data models (RunData, StepStatus, etc.)
+├── modals.py           # DetailModal, UnitDetailModal, FailureDetailModal, LogModal, ArtifactModal
 ├── __init__.py         # Package exports
-├── screens/            # Screen classes (HomeScreen, MainScreen, SplashScreen, etc.)
+├── screens/            # Screen classes (HomeScreen, MainScreen, SplashScreen, DiagnosticsScreen, etc.)
 ├── config_editor/      # Pipeline configuration editor
 ├── utils/              # Utility functions (runs, pipelines, formatting)
 └── widgets/            # Reusable widget components
@@ -60,7 +61,9 @@ OctobatchApp.on_mount()
 Navigation Flow:
 HomeScreen ─┬─ N → NewRunModal → subprocess launch
             ├─ Enter → MainScreen (selected run)
-            ├─ P → ConfigListScreen (pipeline editor)
+            ├─ L → ConfigListScreen (pipeline editor)
+            ├─ W → Name run (TextInputModal)
+            ├─ Space+C → Compare selected runs
             └─ R → Resume detached/paused run
 ```
 
@@ -88,7 +91,8 @@ Formatting and status functions in `utils/` have no UI dependencies:
 - Centralized in `__init__.py` for clean imports
 
 ### Data Loading Strategy
-- Lazy loading: Units only loaded when drilling into a chunk
+- Step-scoped loading: Unit view loads units for the selected step (not all steps)
+- Background loading: `_load_all_units()` runs in a thread to avoid UI stalls
 - Limited display: Max 500 units for performance
 - Manifest is source of truth for run state
 
@@ -249,7 +253,6 @@ Recent Runs table now scrolls parent VerticalScroll to keep selected row visible
 - Expression step pipelines display correctly in run detail view
 
 ### Known Limitations
-- No real-time progress updates (requires manual refresh)
 - Large unit lists capped at 500 for performance
 
 ### Technical Debt
@@ -276,7 +279,7 @@ python -c "from scripts.tui import run_tui; run_tui(debug=True)"
 3. **New Run**: Press N, fill form, verify subprocess starts
 4. **Resume**: Select detached run, press R, verify orchestrator launches
 5. **Navigation**: Enter drills down, Escape goes back
-6. **Refresh**: Press R (lowercase) to reload data
+6. **Refresh**: Use `Ctrl+R` or `F5` to reload data
 
 ### Debug Log
 Check `tui_debug.log` in working directory for detailed operation logs.

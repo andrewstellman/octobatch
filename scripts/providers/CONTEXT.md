@@ -35,6 +35,7 @@ Abstract base class defining the unified LLM provider interface.
 - `get_provider_models(provider_name)` — Models dict for a provider
 - `get_provider_info(provider_name)` — Provider-level metadata (env_var, sdk, default_model)
 - `get_default_pricing()` — Fallback pricing defaults
+- `get_all_providers()` — Returns full providers section of registry
 
 **Exception Classes:**
 - `ProviderError` — Base exception for all provider errors

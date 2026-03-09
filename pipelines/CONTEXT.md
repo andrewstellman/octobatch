@@ -562,8 +562,49 @@ print(validate_expression('invalid syntax here'))  # Should be (False, '...')
 "
 ```
 
-## 13. Known Limitations
+## 13. Fan-Out Steps
 
-- Items source must be YAML (no JSONL support)
+Steps with `scope: fan_out` expand array fields into individual child units for one-to-many pipeline branching:
+
+```yaml
+- name: expand_items
+  scope: fan_out
+  field: items_array        # Array field in parent unit to expand
+  child_field: item         # Field name for each element in child unit
+```
+
+**Key characteristics:**
+- Child unit IDs: `{parent_id}__fan{NNN}` (zero-padded 3-digit index)
+- Metadata fields `_fan_parent_id` and `_fan_index` added to each child
+- Children packed into new chunks respecting `processing.chunk_size`
+- Parent chunk marked `VALIDATED` (terminal) after fan-out
+- New chunks registered as `{next_step}_PENDING`
+- Exempt from the 4-Point Link Rule — only needs a `pipeline.steps` entry
+- Validation funnel shows fan-out boundary as "N units created from M parents"
+
+## 14. Post-Processing
+
+Pipelines can define post-processing steps that run after the main pipeline completes:
+
+```yaml
+post_process:
+  - name: strategy_comparison
+    script: scripts/analyze_results.py
+    args: ["--group-by", "strategy", "--count-field", "result"]
+  - name: compress
+    type: gzip
+    files: ["*_validated.jsonl"]
+    keep_originals: false
+```
+
+**Post-process types:**
+- **Script execution**: Runs `script` with `args` against the run directory
+- **Gzip compression** (`type: gzip`): Compresses specified files in the run directory
+
+All three example pipelines (Blackjack, DrunkenSailor, NPCDialog) use post-processing with `scripts/analyze_results.py` for statistical analysis.
+
+## 15. Known Limitations
+
+- Items source must be single-document YAML/JSON (no JSONL support)
 - Templates must output valid JSON (no streaming)
 - cross_product strategy requires all groups to have items (empty groups cause errors)

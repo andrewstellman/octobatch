@@ -64,6 +64,17 @@ The engine of the system. It runs as a subprocess and manages the lifecycle of a
 - `--provider`: Override provider (gemini/openai/anthropic)
 - `--model`: Override model identifier
 - `--quiet`: Suppress console output (log files still written)
+- `--compare RUN1 RUN2 ...`: Cross-run comparison (2+ runs)
+- `--ps`: List all runs with status, progress, cost
+- `--info`: Print detailed run information
+- `--verify`: Check run integrity (missing, duplicated, orphaned units)
+- `--repair`: Create retry chunks for missing units found by `--verify`
+- `--validate-config`: Validate config file and expressions
+- `--status`: Show current run status
+- `--failures-by FIELD`: Group failures by field in `--report`
+- `--max-cost AMOUNT`: Stop if estimated cost exceeds threshold
+- `--timeout DURATION`: Stop after duration (e.g., '30m', '2h')
+- `--json`: Output in JSON format (used with `--ps`, `--info`, `--verify`, `--report`)
 
 **Fan-Out Steps (`scope: fan_out`):**
 Fan-out steps expand array fields in parent units into individual child units, enabling one-to-many pipeline branching. Each child inherits all parent fields plus the individual array element.
@@ -186,7 +197,7 @@ pipeline:
 ### Creating & Editing Pipelines
 
 1. **Define:** Create a folder in `pipelines/` with config.yaml, templates, and schemas
-2. **Browse:** Open the TUI, press `P` to view Pipeline Configurations
+2. **Browse:** Open the TUI, press `L` to view Pipeline Configurations
 3. **Edit:** Select a pipeline, navigate to a step, press `C` to copy context
 4. **Refine:** Paste into Claude Code, ask for changes (e.g., "Add a confidence score field")
 5. **Save:** Claude Code modifies the template/config files directly
@@ -278,13 +289,13 @@ project-root/
 │   ├── orchestrate.py      # Main orchestration engine
 │   ├── octobatch_step.py   # Generic step executor
 │   ├── realtime_provider.py # Synchronous API calls
+│   ├── tui.py             # TUI entry point
 │   └── tui/
 │       ├── app.py          # Textual App class
-│       ├── tui.py          # Entry point
 │       ├── screens/        # Screen classes
 │       │   ├── home_screen.py
 │       │   ├── main_screen.py
-│       │   ├── modals.py          # ConfirmModal, TextInputModal, TroubleshootModal
+│       │   ├── modals.py          # ArchiveConfirmModal, ConfirmModal, TextInputModal
 │       │   ├── new_run_modal.py
 │       │   └── splash_screen.py
 │       ├── widgets/        # Reusable widget components

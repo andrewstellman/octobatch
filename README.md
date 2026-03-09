@@ -46,7 +46,17 @@ Three working pipelines are included. Each walkthrough includes the exact Claude
 
 ## Use Your Favorite AI to Get Help with Octobatch
 
-Upload two files — `pipelines/TOOLKIT.md` and `ai_context/PROJECT_CONTEXT.md` — to any AI assistant (ChatGPT, Gemini, Claude, Copilot, or whatever you prefer) and ask it anything: how to create pipelines, debug validation failures, resume stuck runs, reduce costs, or understand how expression steps work. You can also paste in screenshots of the TUI and ask "what do I do?" — the AI will read the screen and give you specific advice. The context files contain everything the AI needs to give you accurate, specific answers — it becomes your interactive documentation.
+Upload two files — `pipelines/TOOLKIT.md` and `ai_context/PROJECT_CONTEXT.md` — to any AI assistant (ChatGPT, Gemini, Claude, Copilot, or whatever you prefer) and ask it anything: how to create pipelines, debug validation failures, resume stuck runs, reduce costs, or understand how expression steps work. You can also paste in screenshots of the TUI and ask "what do I do?" — the AI will read the screen and give you specific advice. 
+
+Here's a sample prompt that you can use:
+
+```
+I've attached the Octobatch toolkit and project context. You are an Octobatch expert. 
+Please help me with the following: 
+[describe your question]
+```
+
+The context files contain everything the AI needs to give you accurate, specific answers — it becomes your interactive documentation.
 
 ![Using ChatGPT for help with Octobatch](docs/images/using-chatgpt-for-help.png)
 

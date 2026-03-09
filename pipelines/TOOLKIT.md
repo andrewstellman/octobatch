@@ -1891,6 +1891,9 @@ python scripts/orchestrate.py --restart --run-dir runs/test
 
 # Name/rename a run
 python scripts/orchestrate.py --name "New Display Name" --run-dir runs/test
+
+# Compare 2+ runs side by side
+python scripts/orchestrate.py --compare runs/run1 runs/run2
 ```
 
 ### TUI

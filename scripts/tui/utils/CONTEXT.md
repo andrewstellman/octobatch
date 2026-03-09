@@ -168,6 +168,18 @@ status → symbol, color
 | `determine_run_status(step_statuses)` | Overall run status |
 | `determine_chunk_status(chunk_state, pipeline)` | Chunk status from state |
 
+### diagnostics.py (Diagnostic Generation)
+**Functions:**
+
+| Function | Purpose |
+|----------|---------|
+| `generate_diagnostic(run_dir)` | Generate comprehensive diagnostic report for a run |
+| `scan_step_health(run_dir, pipeline)` | Analyze per-step health (valid/failed counts, error patterns) |
+| `verify_disk_vs_manifest(run_dir, pipeline, manifest)` | Cross-check disk state against manifest state |
+| `get_step_failure_analysis(run_dir, step_name)` | Detailed failure analysis for a specific step |
+
+Used by `DiagnosticsScreen` (D key in detail view) and `action_generate_diagnostic()`.
+
 ### __init__.py (Module Exports)
 Centralizes all exports for clean imports:
 ```python

@@ -7,7 +7,7 @@ This directory contains the core orchestration logic for the Octobatch batch pro
 
 ## 2. Key Components
 
-### orchestrate.py (Main Orchestrator - ~5,900 lines)
+### orchestrate.py (Main Orchestrator - ~7,400 lines)
 The central CLI tool managing all batch processing operations.
 
 **CLI Modes (mutually exclusive except `--init` + `--realtime`):**
@@ -23,8 +23,29 @@ The central CLI tool managing all batch processing operations.
 - `--info`: Print detailed run information
 - `--verify`: Check run integrity — find missing, duplicated, or orphaned units
 - `--repair`: Create retry chunks for missing units found by `--verify`
+- `--restart`: Kill running orchestrator and relaunch with same arguments
+- `--report`: Generate pipeline validation funnel report (supports `--json`)
+- `--compare RUN1 RUN2 ...`: Cross-run comparison (2+ runs)
+- `--name "NAME"`: Set or update display name for a run
+
+**Additional Flags:**
+- `--run-dir` / `-r`: Path to run directory (required for most operations)
+- `--config` / `-c`: Path to config.yaml (for `--init` and `--validate-config`)
+- `--pipeline` / `-p`: Pipeline name from `pipelines/` folder (alternative to `--config`)
+- `--provider`: Override provider (gemini/openai/anthropic)
+- `--model`: Override model identifier
+- `--max-units` / `--limit`: Limit to first N units (for testing)
+- `--repeat`: Override `processing.repeat` count
+- `--max-retries`: Maximum retry attempts per item (default: 5)
+- `--interval`: Seconds between polls in watch mode (default: 5)
+- `--max-cost`: Stop if estimated cost exceeds threshold (USD)
+- `--timeout`: Stop after duration (e.g., '30m', '2h')
+- `--yes` / `-y`: Skip confirmation prompts
 - `--quiet` / `-q`: Suppress console output (log files still written)
-- `--json`: Output in JSON format (used with `--ps`, `--info`, `--verify`)
+- `--json`: Output in JSON format (used with `--ps`, `--info`, `--verify`, `--report`)
+- `--failures-by FIELD`: Group failures by field in `--report`
+- `--step`: Step name (used with `--revalidate`)
+- `--use-source-config` / `--use-run-config`: Config source for `--revalidate`
 - `--version`: Print version and exit
 
 **Key Functions:**
@@ -44,6 +65,22 @@ The central CLI tool managing all batch processing operations.
 - `_handle_info(args)`: Detailed run info — loads manifest, shows pipeline steps with per-step valid counts, chunk states. JSON mode outputs full manifest.
 - `_handle_verify(args)`: Calls `verify_run()` from `run_tools.py`. Reports per-step missing/duplicated units.
 - `_handle_repair(args)`: Calls `repair_run()` from `run_tools.py`. Creates retry chunks for missing units. Requires `--yes` or interactive confirmation.
+- `_handle_restart(args)`: Kill running orchestrator (SIGTERM → SIGKILL) and relaunch with same arguments.
+- `_handle_report(args)`: Generate pipeline validation funnel report. Calls `generate_report()` from `run_tools.py`.
+- `_handle_compare(args)`: Cross-run comparison. Calls `compare_runs()` from `run_tools.py`.
+- `_handle_name(args)`: Set or update display name in manifest metadata.
+
+**Fan-Out Step Functions:**
+- `run_fan_out_step()`: Expands array fields in parent units into child units. Creates new chunks respecting `chunk_size`, registers as `{next_step}_PENDING`.
+- `is_fan_out_step(config, step_name)`: Check if step has `scope: fan_out`
+- `get_fan_out_step_config(config, step_name)`: Get full config for fan-out step
+
+**Mode Switch Support:**
+- `_drain_outstanding_batches()`: Poll already-submitted batch chunks until none remain, used before mode switch.
+- `watch_run()` and `realtime_run()` check `manifest.metadata.scheduled_mode_switch` at startup.
+
+**Revalidation:**
+- `revalidate_failures()`: Re-run validation on existing failures without API calls. Supports `--step` to target specific step, `--use-source-config`/`--use-run-config` to choose config source.
 
 **Signal Handling:**
 - `SIGINT` / `SIGTERM`: Graceful shutdown — save manifest, mark run paused, terminate children
@@ -62,11 +99,16 @@ The central CLI tool managing all batch processing operations.
 - `max_iterations` (default 1000) prevents infinite loops
 - Each iteration uses seed: `(base_seed + iteration) & 0x7FFFFFFF` for deterministic randomness
 
+### version.py
+Single source of truth for version string.
+- `__version__`: Version string (`"1.1.0"`)
+
 ### octobatch_utils.py (~480 lines)
-Shared utilities for file I/O, logging, telemetry, and manifest summary generation.
+Shared utilities for file I/O, logging, telemetry, and manifest summary generation. Imports `__version__` from `version.py` for backwards compatibility.
 
 **Key Functions:**
-- `__version__`: Version string (`"1.0.0"`)
+- `parse_json_response()`: JSON parsing with markdown code block extraction and LLM quirk handling (trailing commas, `+N` numbers)
+- `create_interpreter()`: Safe asteval interpreter for validation expressions
 - `load_manifest()` / `save_manifest()`: Atomic manifest operations; `save_manifest()` also writes `.manifest_summary.json` (~300 bytes) for fast TUI startup
 - `_build_summary()`: Extracts lightweight summary from manifest (status, progress, units, cost, tokens, mode, pipeline, timestamps)
 - `_compute_summary_cost()`: Best-effort cost calculation from model registry pricing
@@ -76,14 +118,16 @@ Shared utilities for file I/O, logging, telemetry, and manifest summary generati
 - `trace_log()`: Timestamped trace lines to TRACE_LOG.txt for request-level telemetry; always written (not gated behind flags); best-effort (never fails the caller)
 - `compute_cost()`: Cost calculation from token counts
 
-### run_tools.py (~250 lines)
-CLI tools for run verification and repair. Addresses QUALITY.md Scenario 1 (Silent Attrition).
+### run_tools.py (~1,100 lines)
+CLI tools for run verification, repair, cross-run comparison, and reporting. Addresses QUALITY.md Scenario 1 (Silent Attrition).
 
 **Key Functions:**
 - `verify_run(run_dir)`: Check run integrity by comparing expected units against actual outputs per pipeline step. Returns structured result with per-step counts of missing, duplicated, and orphaned units.
 - `repair_run(run_dir)`: Create retry chunks for missing units. Calls `verify_run()` internally, creates new chunks at the step where units went missing, copies unit data from previous step's validated output.
-- `parse_json_response()`: JSON parsing with markdown code block extraction and LLM quirk handling (trailing commas, `+N` numbers)
-- `create_interpreter()`: Safe asteval interpreter for validation expressions
+- `compare_runs(run_names)`: Cross-run comparison with pass rates, costs, strategy data. Saves markdown report.
+- `compare_hands(run_dir1, run_dir2, unit_id, sample)`: Hand-by-hand diff of validated outputs across two runs. Shows divergent fields, supports `--sample N` limiting.
+- `generate_report(run_dir, failures_by)`: Validation funnel report with optional failure grouping by any field. Shows fan-out boundaries.
+- `_resolve_run_dir(name)`: Resolves short names and prefixes against `runs/` directory.
 
 ### config_validator.py (~746 lines)
 Comprehensive config validation with expression testing.
@@ -127,6 +171,21 @@ Expression-based business logic validation.
 - Required fields, type checking, range/enum validation
 - Custom rules using asteval expressions
 - Warning vs error levels
+
+### analyze_results.py
+Post-run analysis tool. Reads `*_validated.jsonl` from run directories and generates statistics tables grouped by specified fields. Used by `post_process` config in pipelines.
+
+### compare_hands.py
+CLI wrapper for `run_tools.compare_hands()`. Enables cross-run hand-by-hand comparison from the command line.
+
+### extract_units.py
+Universal unit extractor. Reads validated/failed JSONL from run directories.
+
+### tui.py
+Entry point for the TUI application. Invokes `run_tui()` from `scripts/tui/app.py`.
+
+### tui_dump.py
+TUI state dumper for debugging. Outputs TUI rendering as text for automated testing.
 
 ### generate_units.py (~663 lines)
 Unit generation with multiple combination strategies.
@@ -223,8 +282,8 @@ Active subprocesses tracked in `_active_subprocesses` list. Signal handlers (SIG
 
 ### CLI Tools & TUI Startup Perf (Feb 21, 2026) — Latest
 - **CLI tools**: Added `--version`, `--ps`, `--info`, `--verify`, `--repair`, `--json` flags to orchestrate.py. `--ps` lists all runs as a formatted table. `--info` prints detailed run info with pipeline step funnel. `--verify` checks run integrity (missing/duplicated units per step). `--repair` creates retry chunks for missing units. All reuse TUI utility functions (pure, no Textual dependency).
-- **`run_tools.py`** (new): `verify_run()` and `repair_run()` functions for run integrity checking and repair. Addresses QUALITY.md Scenario 1 (Silent Attrition).
-- **`__version__`**: Added `__version__ = "1.0.0"` to `octobatch_utils.py`.
+- **`run_tools.py`** (new): `verify_run()` and `repair_run()` functions for run integrity checking and repair. Addresses QUALITY.md Scenario 1 (Silent Attrition). Later expanded with `compare_runs()`, `compare_hands()`, `generate_report()`, `_resolve_run_dir()`.
+- **`version.py`**: Version string `__version__` (now `"1.1.0"`) in dedicated file; imported by `octobatch_utils.py` for backwards compatibility.
 - **Launcher scripts**: `octobatch` and `octobatch-tui` shell wrappers in project root for convenience.
 - **Manifest summary cache**: `save_manifest()` now writes `.manifest_summary.json` (~300 bytes) alongside `MANIFEST.json`. The TUI reads this for the home screen DataTable instead of parsing multi-MB manifests.
 - **Async TUI startup**: HomeScreen renders immediately and loads data in a background thread via `@work(thread=True)`. Auto-poll refresh also runs in background thread.

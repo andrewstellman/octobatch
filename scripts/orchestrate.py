@@ -7413,6 +7413,8 @@ if __name__ == "__main__":
                 log_file = run_dir / "RUN_LOG.txt"
                 log_message(log_file, "CRASH", f"Unhandled exception in main()")
                 log_message(log_file, "TRACEBACK", tb)
+                # Mark manifest as failed so TUI shows correct status
+                mark_run_failed(run_dir, f"Unhandled exception: {tb.splitlines()[-1]}", log_traceback=False)
             except Exception:
                 pass
         sys.exit(1)

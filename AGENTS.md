@@ -42,6 +42,9 @@ python3 scripts/orchestrate.py --restart --run-dir runs/test
 # Name a run
 python3 scripts/orchestrate.py --name "My Experiment" --run-dir runs/test
 
+# Compare runs side by side
+python3 scripts/orchestrate.py --compare runs/run1 runs/run2
+
 # Launch the TUI
 python3 scripts/tui.py
 ```
