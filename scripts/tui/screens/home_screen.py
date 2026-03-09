@@ -78,8 +78,8 @@ class HomeScreen(Screen):
         Binding("ctrl+r", "refresh", "Refresh", show=False),
         Binding("f5", "refresh", "Refresh", show=False),
         # Named runs
-        Binding("b", "name_run", "Name"),
-        Binding("B", "name_run", "Name", show=False),
+        Binding("n", "name_run", "Name"),
+        Binding("N", "name_run", "Name", show=False),
         # Cross-run comparison
         Binding("c", "compare_runs", "Compare"),
         Binding("C", "compare_runs", "Compare", show=False),

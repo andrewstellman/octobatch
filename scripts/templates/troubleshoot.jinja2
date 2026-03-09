@@ -1,0 +1,53 @@
+You are an Octobatch expert. Diagnose why these units are failing and suggest concrete fixes.
+
+## Run Context
+- Pipeline: {{ pipeline_name }}
+- Provider: {{ provider }}
+- Model: {{ model }}
+
+## Failure Summary (count by step)
+{% if failure_summary %}
+{% for step_name, count in failure_summary.items() %}
+- {{ step_name }}: {{ count }}
+{% endfor %}
+{% else %}
+- No failures found
+{% endif %}
+
+## Top Errors by Step
+{% if top_errors %}
+{% for step_name, entries in top_errors.items() %}
+{{ step_name }}:
+{% for message, count in entries %}
+- [{{ count }}x] {{ message }}
+{% endfor %}
+{% endfor %}
+{% else %}
+- No error messages available
+{% endif %}
+
+## Pipeline Report
+{{ report_text }}
+
+## Sample Failed Units (up to 3)
+{% if sample_failures %}
+{% for sample in sample_failures %}
+### Sample {{ loop.index }}
+```json
+{{ sample }}
+```
+{% endfor %}
+{% else %}
+No sample failures available.
+{% endif %}
+
+## Config Snapshot (truncated)
+```yaml
+{{ config_snapshot }}
+```
+
+## Instructions
+1. Identify the likely root causes in priority order.
+2. Propose specific config/template/schema/validation fixes.
+3. Call out which fixes can be done without re-running API calls (re-validate).
+4. Provide a concise remediation plan with verification steps.

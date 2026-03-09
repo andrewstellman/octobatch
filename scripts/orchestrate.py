@@ -2238,7 +2238,7 @@ def build_run_status(
     }
 
 
-def tick_run(run_dir: Path, max_retries: int = 5) -> dict:
+def tick_run(run_dir: Path, max_retries: int = 5, drain_submitted_only: bool = False) -> dict:
     """
     Execute one tick of the orchestration loop.
 
@@ -2621,7 +2621,7 @@ def tick_run(run_dir: Path, max_retries: int = 5) -> dict:
                 "chunk": chunk_name
             })
 
-    # Phase 2: Submit new batches
+    # Phase 2: Submit/process pending chunks
     # Recount inflight after polling
     inflight = sum(1 for c in chunks.values() if parse_state(c["state"])[1] == "SUBMITTED")
     _logged_batch_steps = set()  # Track which steps have had provider logged
@@ -2632,6 +2632,8 @@ def tick_run(run_dir: Path, max_retries: int = 5) -> dict:
 
         if status == "PENDING":
             pending += 1
+            if drain_submitted_only:
+                continue
 
             # Log provider/model once per step
             if step not in _logged_batch_steps:
@@ -2736,30 +2738,21 @@ def tick_run(run_dir: Path, max_retries: int = 5) -> dict:
                 log_message(log_file, "FAN_OUT", f"{chunk_name}: Running fan-out step '{step}' locally")
 
                 try:
-                    valid, _, _, _ = run_fan_out_step(
+                    child_count, created_chunks, _, _ = run_fan_out_step(
                         run_dir, chunk_name, step, fan_out_config, config, manifest, log_file
                     )
 
-                    chunk_data["valid"] = valid
+                    # Parent chunk is terminal at the fan-out boundary. Child units are
+                    # represented by new chunks for downstream steps.
+                    chunk_data["valid"] = child_count
                     chunk_data["failed"] = 0
-
-                    if valid == 0:
-                        log_message(log_file, "STOP", f"{chunk_name}: Fan-out step {step} produced 0 children. Marking chunk as FAILED.")
-                        chunk_data["state"] = "FAILED"
-                        chunk_data["retries"] = max_retries
-                        failed += 1
-                        save_manifest(run_dir, manifest)
+                    chunk_data["state"] = "VALIDATED"
+                    completed += 1
+                    if created_chunks > 0:
+                        log_message(log_file, "FAN_OUT", f"{chunk_name}: {step} complete ({child_count} children) -> {created_chunks} new chunks")
                     else:
-                        next_step = get_next_step(pipeline, step)
-                        if next_step:
-                            chunk_data["state"] = f"{next_step}_PENDING"
-                            log_message(log_file, "FAN_OUT", f"{chunk_name}: {step} complete ({valid} children) -> {next_step}_PENDING")
-                        else:
-                            chunk_data["state"] = "VALIDATED"
-                            log_message(log_file, "FAN_OUT", f"{chunk_name}: {step} complete ({valid} children) -> VALIDATED")
-                            completed += 1
-
-                        save_manifest(run_dir, manifest)
+                        log_message(log_file, "FAN_OUT", f"{chunk_name}: {step} complete ({child_count} children) -> VALIDATED")
+                    save_manifest(run_dir, manifest)
 
                 except Exception as e:
                     log_message(log_file, "ERROR", f"{chunk_name}: Fan-out step '{step}' failed: {e}")
@@ -3442,6 +3435,50 @@ def get_next_retry_number(chunks_dir: Path) -> int:
     return max_num + 1
 
 
+def get_next_chunk_number(chunks: dict) -> int:
+    """Find the next available chunk_NNN number from manifest chunk keys."""
+    max_num = -1
+    for chunk_name in chunks.keys():
+        if chunk_name.startswith("chunk_"):
+            suffix = chunk_name.replace("chunk_", "", 1)
+            if suffix.isdigit():
+                max_num = max(max_num, int(suffix))
+    return max_num + 1
+
+
+def _count_submitted_chunks(manifest: dict) -> int:
+    """Count chunks currently in *_SUBMITTED states."""
+    count = 0
+    for chunk_data in manifest.get("chunks", {}).values():
+        _, status = parse_state(chunk_data.get("state", ""))
+        if status == "SUBMITTED":
+            count += 1
+    return count
+
+
+def _drain_outstanding_batches(run_dir: Path, max_retries: int, interval_seconds: int = 5) -> bool:
+    """
+    Poll only already-submitted batch chunks until none remain.
+
+    Returns True when all submitted chunks are drained; False on error.
+    """
+    log_file = run_dir / "RUN_LOG.txt"
+
+    while True:
+        manifest = load_manifest(run_dir)
+        submitted = _count_submitted_chunks(manifest)
+        if submitted == 0:
+            return True
+
+        log_message(log_file, "MODE_SWITCH", f"Waiting for {submitted} submitted batch chunk(s) before mode switch")
+        status = tick_run(run_dir, max_retries=max_retries, drain_submitted_only=True)
+        if status.get("error"):
+            log_message(log_file, "ERROR", f"Mode switch drain failed: {status['error']}")
+            return False
+
+        time.sleep(max(1, interval_seconds))
+
+
 def retry_failures_run(run_dir: Path, max_retries: int = 5) -> dict:
     """
     Create retry chunks from failed units.
@@ -3929,6 +3966,24 @@ def watch_run(
             mark_run_complete(run_dir)
             return 0
 
+        scheduled_mode = manifest.get("metadata", {}).get("scheduled_mode_switch")
+        if scheduled_mode == "realtime":
+            log_message(log_file, "MODE_SWITCH", "Scheduled mode switch detected: batch -> realtime")
+            if not _drain_outstanding_batches(run_dir, max_retries=max_retries, interval_seconds=interval):
+                return 1
+
+            manifest = load_manifest(run_dir)
+            manifest.setdefault("metadata", {})["mode"] = "realtime"
+            manifest["metadata"].pop("scheduled_mode_switch", None)
+            save_manifest(run_dir, manifest)
+            log_message(log_file, "MODE_SWITCH", "Outstanding batch chunks drained; switching to realtime mode")
+            return realtime_run(run_dir, max_retries=max_retries, skip_confirmation=True)
+        elif scheduled_mode == "batch":
+            # Already in batch entrypoint; clear stale no-op switch flag.
+            manifest.setdefault("metadata", {})["mode"] = "batch"
+            manifest["metadata"].pop("scheduled_mode_switch", None)
+            save_manifest(run_dir, manifest)
+
     # Track if we've been interrupted
     interrupted = False
 
@@ -4337,16 +4392,14 @@ def run_fan_out_step(
     log_file: Path,
 ) -> tuple[int, int, int, int]:
     """
-    Run a fan-out step that expands an array field into individual child units.
+    Run a deterministic fan-out step and pack children into new chunks.
 
-    For each parent unit, reads the array field specified by step_config['field'],
-    and creates one child unit per array element. Child units inherit all parent
-    fields plus the individual element in step_config['child_field'].
-
-    Fan-out is deterministic — no failure mode. All children are written as validated.
+    Child units are written to newly-created chunk_NNN directories (not the parent
+    chunk), respecting processing.chunk_size. Each new chunk receives up to
+    chunk_size children and is initialized in the next step's pending state.
 
     Returns:
-        Tuple of (child_count, 0, 0, 0) — no failures, no tokens
+        Tuple of (child_count, new_chunk_count, 0, 0)
     """
     field_name = step_config.get("field")
     child_field = step_config.get("child_field", field_name)
@@ -4403,17 +4456,64 @@ def run_fan_out_step(
             child["_fan_parent_id"] = parent_id
             child_units.append(child)
 
-    # Write fan-out output as validated (no failure mode)
-    validated_file = chunk_dir / f"{step}_validated.jsonl"
-    with open(validated_file, 'w') as f:
-        for child in child_units:
-            f.write(json.dumps(child) + "\n")
-
     child_count = len(child_units)
     parent_count = len(units)
-    log_message(log_file, "FAN_OUT", f"{chunk_name}/{step}: {child_count} children from {parent_count} parents")
+    if child_count == 0:
+        log_message(log_file, "FAN_OUT", f"{chunk_name}/{step}: 0 children from {parent_count} parents")
+        return (0, 0, 0, 0)
 
-    return (child_count, 0, 0, 0)
+    next_step = get_next_step(pipeline, step)
+    if not next_step:
+        # Final step fan-out: no downstream step exists, so keep output in the parent
+        # chunk and mark it validated in the caller.
+        validated_file = chunk_dir / f"{step}_validated.jsonl"
+        with open(validated_file, 'w') as f:
+            for child in child_units:
+                f.write(json.dumps(child) + "\n")
+        log_message(log_file, "FAN_OUT", f"{chunk_name}/{step}: {child_count} children from {parent_count} parents (final step)")
+        return (child_count, 0, 0, 0)
+
+    chunk_size = config.get("processing", {}).get("chunk_size", 100)
+    if not isinstance(chunk_size, int) or chunk_size <= 0:
+        chunk_size = 100
+
+    chunks = manifest.setdefault("chunks", {})
+    next_chunk_num = get_next_chunk_number(chunks)
+    created_chunks = 0
+
+    for i in range(0, child_count, chunk_size):
+        chunk_children = child_units[i:i + chunk_size]
+        new_chunk_name = f"chunk_{next_chunk_num:03d}"
+        next_chunk_num += 1
+        created_chunks += 1
+
+        new_chunk_dir = run_dir / "chunks" / new_chunk_name
+        new_chunk_dir.mkdir(parents=True, exist_ok=True)
+
+        fanout_validated = new_chunk_dir / f"{step}_validated.jsonl"
+        with open(fanout_validated, "w") as f:
+            for child in chunk_children:
+                f.write(json.dumps(child) + "\n")
+
+        chunks[new_chunk_name] = {
+            "state": f"{next_step}_PENDING",
+            "items": len(chunk_children),
+            "valid": 0,
+            "failed": 0,
+            "retries": 0,
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "submitted_at": None,
+            "provider_status": None,
+        }
+
+    log_message(
+        log_file,
+        "FAN_OUT",
+        f"{chunk_name}/{step}: {child_count} children from {parent_count} parents -> {created_chunks} new chunks (chunk_size={chunk_size})"
+    )
+
+    return (child_count, created_chunks, 0, 0)
 
 
 def is_expression_step(config: dict, step_name: str) -> bool:
@@ -5207,6 +5307,23 @@ def realtime_run(
     pipeline = manifest["pipeline"]
     chunks = manifest["chunks"]
 
+    scheduled_mode = manifest.get("metadata", {}).get("scheduled_mode_switch")
+    if scheduled_mode == "batch":
+        log_message(log_file, "MODE_SWITCH", "Scheduled mode switch detected: realtime -> batch")
+        if not _drain_outstanding_batches(run_dir, max_retries=max_retries, interval_seconds=5):
+            return 1
+        manifest = load_manifest(run_dir)
+        manifest.setdefault("metadata", {})["mode"] = "batch"
+        manifest["metadata"].pop("scheduled_mode_switch", None)
+        save_manifest(run_dir, manifest)
+        log_message(log_file, "MODE_SWITCH", "Outstanding batch chunks drained; switching to batch mode")
+        return watch_run(run_dir, interval=5, max_retries=max_retries)
+    elif scheduled_mode == "realtime":
+        # Already in realtime entrypoint; clear stale no-op switch flag.
+        manifest.setdefault("metadata", {})["mode"] = "realtime"
+        manifest["metadata"].pop("scheduled_mode_switch", None)
+        save_manifest(run_dir, manifest)
+
     # Scan for validation failures that can be retried (runs at startup, not gated by terminal state)
     archived = retry_validation_failures(run_dir, manifest, log_file, max_retries=max_retries)
     if archived > 0:
@@ -5540,26 +5657,21 @@ def realtime_run(
                     if is_fan_out_step(config, step):
                         fan_out_config = get_fan_out_step_config(config, step)
 
-                        valid, _, _, _ = run_fan_out_step(
+                        child_count, created_chunks, _, _ = run_fan_out_step(
                             run_dir, chunk_name, step, fan_out_config, config, manifest, log_file
                         )
 
                         chunk_data = manifest["chunks"][chunk_name]
-                        chunk_data["valid"] = valid
+                        chunk_data["valid"] = child_count
                         chunk_data["failed"] = 0
+                        chunk_data["state"] = "VALIDATED"
 
-                        if valid == 0:
-                            log_message(log_file, "STOP", f"{chunk_name}: Fan-out step {step} produced 0 children. Marking chunk as FAILED.")
-                            chunk_data["state"] = "FAILED"
-                            chunk_data["retries"] = max_retries
+                        if created_chunks > 0:
+                            log_message(log_file, "FAN_OUT", f"{chunk_name}: {step} complete ({child_count} children) -> {created_chunks} new chunks")
                         else:
-                            next_step = get_next_step(pipeline, step)
-                            if next_step:
-                                chunk_data["state"] = f"{next_step}_PENDING"
-                            else:
-                                chunk_data["state"] = "VALIDATED"
+                            log_message(log_file, "FAN_OUT", f"{chunk_name}: {step} complete ({child_count} children) -> VALIDATED")
 
-                        step_valid += valid
+                        step_valid += child_count
                         save_manifest(run_dir, manifest)
                         continue
 
@@ -5872,23 +5984,23 @@ def realtime_run(
     return 0 if remaining_failures == 0 else 1
 
 
-def revalidate_failures(run_dir: Path, step_name: str, use_source_config: bool = False) -> dict:
+def revalidate_failures(run_dir: Path, step_name: str | None = None, use_source_config: bool = True) -> dict:
     """
-    Re-validate existing failure records for a specific step without API calls.
+    Re-validate existing failure records for one or all steps without API calls.
 
     Feeds raw_response from failure records through the current validation pipeline
     (schema + business logic) to promote units that now pass updated validators.
 
     Args:
         run_dir: Path to run directory
-        step_name: Pipeline step name to re-validate
-        use_source_config: If True, use source pipeline config instead of run snapshot
+        step_name: Optional pipeline step name to re-validate. If None, re-validate all steps.
+        use_source_config: If True, use source pipeline config instead of run snapshot.
 
     Returns:
         Dict with results: {"promoted": N, "still_failing": N, "errors": N}
     """
     log_file = run_dir / "RUN_LOG.txt"
-    log_message(log_file, "REVALIDATE", f"Starting re-validation for step '{step_name}'")
+    log_message(log_file, "REVALIDATE", f"Starting re-validation for step '{step_name or 'ALL'}'")
 
     # Safety: check that no orchestrator is running on this run
     pid_file = run_dir / "orchestrator.pid"
@@ -5935,8 +6047,36 @@ def revalidate_failures(run_dir: Path, step_name: str, use_source_config: bool =
 
     # Verify step exists in pipeline
     pipeline = manifest.get("pipeline", [])
-    if step_name not in pipeline:
+    if step_name is not None and step_name not in pipeline:
         return {"error": f"Step '{step_name}' not in pipeline: {pipeline}"}
+
+    # Re-validate all steps when no step is specified.
+    if step_name is None:
+        aggregate = {"promoted": 0, "still_failing": 0, "errors": 0, "steps": {}}
+        for pipeline_step in pipeline:
+            step_result = revalidate_failures(
+                run_dir=run_dir,
+                step_name=pipeline_step,
+                use_source_config=use_source_config,
+            )
+            if step_result.get("error"):
+                return step_result
+            aggregate["steps"][pipeline_step] = step_result
+            aggregate["promoted"] += step_result.get("promoted", 0)
+            aggregate["still_failing"] += step_result.get("still_failing", 0)
+            aggregate["errors"] += step_result.get("errors", 0)
+
+        log_message(
+            log_file,
+            "REVALIDATE",
+            f"ALL steps: {aggregate['promoted']} promoted, "
+            f"{aggregate['still_failing']} still failing, {aggregate['errors']} errors"
+        )
+        print(
+            f"[REVALIDATE] ALL: {aggregate['promoted']} promoted, "
+            f"{aggregate['still_failing']} still failing, {aggregate['errors']} errors"
+        )
+        return aggregate
 
     # Resolve schema path
     schemas_config = config.get("schemas", {})
@@ -6568,9 +6708,11 @@ def _handle_restart(args):
 
 def _handle_report(args):
     """Handle --report: generate detailed run report."""
-    from run_tools import generate_report
+    from run_tools import generate_report, _resolve_run_dir
 
     run_dir = args.run_dir
+    if run_dir and not run_dir.exists():
+        run_dir = _resolve_run_dir(str(run_dir))
     failures_by = getattr(args, 'failures_by', None)
     report = generate_report(run_dir, failures_by=failures_by)
 
@@ -6818,7 +6960,7 @@ def main():
     mode_group.add_argument(
         "--revalidate",
         action="store_true",
-        help="Re-run validation on existing failures without API calls (requires --step)"
+        help="Re-run validation on existing failures without API calls (all steps by default)"
     )
     mode_group.add_argument(
         "--ps",
@@ -6963,7 +7105,12 @@ def main():
     parser.add_argument(
         "--use-source-config",
         action="store_true",
-        help="Use source pipeline config instead of run snapshot (used with --revalidate)"
+        help="Use source pipeline config instead of run snapshot (default for --revalidate)"
+    )
+    parser.add_argument(
+        "--use-run-config",
+        action="store_true",
+        help="Use run snapshot config instead of source pipeline config (used with --revalidate)"
     )
 
     args = parser.parse_args()
@@ -7033,6 +7180,9 @@ def main():
 
     # Handle --report
     if args.report:
+        from run_tools import _resolve_run_dir
+        if args.run_dir and not args.run_dir.exists():
+            args.run_dir = _resolve_run_dir(str(args.run_dir))
         if not args.run_dir.exists():
             parser.error(f"Run directory not found: {args.run_dir}")
         _handle_report(args)
@@ -7045,15 +7195,13 @@ def main():
 
     # Handle --revalidate
     if args.revalidate:
-        if not args.step:
-            parser.error("--step is required with --revalidate")
         if not args.run_dir.exists():
             parser.error(f"Run directory not found: {args.run_dir}")
 
         result = revalidate_failures(
             run_dir=args.run_dir,
             step_name=args.step,
-            use_source_config=args.use_source_config
+            use_source_config=(args.use_source_config or not args.use_run_config)
         )
         if result.get("error"):
             print(f"Error: {result['error']}", file=sys.stderr)

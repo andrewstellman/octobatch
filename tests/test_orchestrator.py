@@ -5584,3 +5584,50 @@ class TestWatchDeltas:
 
         assert len(deltas) == 1
         assert "+4 valid" in deltas[0]
+
+
+class TestRevalidateCLIBehavior:
+    """Re-validate behavior should support all-steps mode."""
+
+    def test_revalidate_function_exists(self):
+        assert callable(orchestrate.revalidate_failures)
+
+    def test_revalidate_step_optional_in_cli_source(self):
+        source = Path(orchestrate.__file__).read_text()
+        assert "--revalidate" in source
+        assert "--step is required with --revalidate" not in source
+
+    def test_revalidate_all_steps_when_step_omitted(self, tmp_path):
+        run_dir = tmp_path / "run"
+        chunk_dir = run_dir / "chunks" / "chunk_000"
+        chunk_dir.mkdir(parents=True)
+        (run_dir / "RUN_LOG.txt").write_text("")
+
+        config_dir = run_dir / "config"
+        config_dir.mkdir(parents=True, exist_ok=True)
+        (config_dir / "config.yaml").write_text(
+            "pipeline:\n"
+            "  steps:\n"
+            "    - name: step1\n"
+            "    - name: step2\n"
+            "schemas:\n"
+            "  schema_dir: schemas\n"
+            "  files: {}\n"
+            "validation: {}\n"
+        )
+
+        manifest = {
+            "pipeline": ["step1", "step2"],
+            "chunks": {"chunk_000": {"state": "VALIDATED", "items": 1, "valid": 1, "failed": 0, "retries": 0}},
+            "status": "complete",
+            "config": "config/config.yaml",
+            "metadata": {"pipeline_name": "test_pipeline"},
+        }
+        (run_dir / "MANIFEST.json").write_text(json.dumps(manifest))
+
+        result = orchestrate.revalidate_failures(run_dir, step_name=None, use_source_config=False)
+        assert "error" not in result
+        assert result["promoted"] == 0
+        assert result["still_failing"] == 0
+        assert result["errors"] == 0
+        assert set(result["steps"].keys()) == {"step1", "step2"}

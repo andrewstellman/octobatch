@@ -7,16 +7,18 @@ Bottom panel toggles between Chunk View and Unit View with V key.
 """
 
 import json
+import os
 import re
 from pathlib import Path
 
 from typing import Any
+from collections import Counter
 
 from textual.app import ComposeResult
 from textual.containers import Container, Horizontal, HorizontalScroll, Vertical, VerticalScroll
 from textual.css.query import NoMatches
 from textual.screen import Screen, ModalScreen
-from textual.widgets import Static, DataTable, Label, Tree
+from textual.widgets import Static, DataTable, Label, Tree, Select, Button, TextArea
 from textual.widgets.tree import TreeNode
 from textual.reactive import reactive
 from textual.binding import Binding
@@ -449,6 +451,110 @@ class UnitDetailModal(ModalScreen):
 
             pyperclip.copy(content)
             self.notify("Copied to clipboard")
+        except ImportError:
+            self.notify("pyperclip not installed", severity="warning")
+        except Exception as e:
+            self.notify(f"Copy failed: {e}", severity="error")
+
+
+class TroubleshootPromptModal(ModalScreen):
+    """Preview/edit troubleshooting prompt and choose provider/model."""
+
+    BINDINGS = [
+        Binding("escape", "cancel", "Cancel"),
+        Binding("c", "copy", "Copy"),
+        Binding("C", "copy", "Copy", show=False),
+    ]
+
+    CSS = """
+    TroubleshootPromptModal {
+        align: center middle;
+    }
+
+    #troubleshoot-modal {
+        width: 90%;
+        height: 90%;
+        border: solid $primary;
+        background: $surface;
+        padding: 1;
+    }
+
+    #troubleshoot-title {
+        height: 1;
+        text-align: center;
+        text-style: bold;
+        margin-bottom: 1;
+    }
+
+    #troubleshoot-provider-label {
+        height: 1;
+    }
+
+    #troubleshoot-provider {
+        height: 3;
+        margin-bottom: 1;
+    }
+
+    #troubleshoot-editor {
+        height: 1fr;
+        border: solid $secondary;
+        margin-bottom: 1;
+    }
+
+    #troubleshoot-actions {
+        height: 3;
+        align: center middle;
+    }
+
+    #troubleshoot-actions Button {
+        margin: 0 1;
+    }
+    """
+
+    def __init__(self, prompt_text: str, provider_options: list[tuple[str, str]], default_provider: str, **kwargs):
+        super().__init__(**kwargs)
+        self._prompt_text = prompt_text
+        self._provider_options = provider_options
+        self._default_provider = default_provider
+
+    def compose(self) -> ComposeResult:
+        with Vertical(id="troubleshoot-modal"):
+            yield Static("AI Troubleshooting Preview", id="troubleshoot-title")
+            yield Static("Provider / model for realtime analysis:", id="troubleshoot-provider-label")
+            yield Select(self._provider_options, value=self._default_provider, id="troubleshoot-provider")
+            yield TextArea(self._prompt_text, id="troubleshoot-editor")
+            with Horizontal(id="troubleshoot-actions"):
+                yield Button("Send", variant="primary", id="troubleshoot-send")
+                yield Button("Cancel", variant="default", id="troubleshoot-cancel")
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        if event.button.id == "troubleshoot-cancel":
+            self.dismiss(None)
+            return
+        if event.button.id == "troubleshoot-send":
+            editor = self.query_one("#troubleshoot-editor", TextArea)
+            provider_select = self.query_one("#troubleshoot-provider", Select)
+            provider_value = provider_select.value
+            if provider_value in (None, Select.BLANK):
+                self.notify("Select a provider/model", severity="warning")
+                return
+            provider_model = str(provider_value)
+            provider_name, model_name = provider_model.split("|", 1)
+            self.dismiss({
+                "prompt": editor.text,
+                "provider": provider_name,
+                "model": model_name,
+            })
+
+    def action_cancel(self) -> None:
+        self.dismiss(None)
+
+    def action_copy(self) -> None:
+        try:
+            import pyperclip
+            editor = self.query_one("#troubleshoot-editor", TextArea)
+            pyperclip.copy(editor.text)
+            self.notify("Prompt copied to clipboard")
         except ImportError:
             self.notify("pyperclip not installed", severity="warning")
         except Exception as e:
@@ -3287,94 +3393,206 @@ Sort (S):      {self.sort_by}
         self.app.call_from_thread(show_modal)
 
     def action_troubleshoot(self) -> None:
-        """AI-assisted troubleshooting for failed runs (T key)."""
+        """AI-assisted troubleshooting with preview -> provider select -> realtime call."""
         import sys
+        from jinja2 import Template
+
         sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
         from run_tools import generate_report
-        from ..modals import DetailModal
 
         run_dir = self.run_data.run_dir
-
-        # Check for failures
+        manifest_path = run_dir / "MANIFEST.json"
         try:
-            result = generate_report(run_dir)
-            if result.get("error"):
-                self.notify("Cannot analyze run", severity="error")
+            manifest = json.loads(manifest_path.read_text())
+        except Exception as e:
+            self.notify(f"Cannot read manifest: {e}", severity="error")
+            return
+
+        try:
+            report = generate_report(run_dir)
+            if report.get("error"):
+                self.notify(f"Cannot analyze run: {report['error']}", severity="error")
                 return
         except Exception as e:
             self.notify(f"Failed to analyze run: {e}", severity="error")
             return
 
-        report_text = result.get("text", "")
+        failure_summary, top_errors, sample_failures = self._collect_failure_summary(run_dir, manifest)
+        if not sample_failures:
+            self.notify("Troubleshooting is only available when failures exist", severity="warning")
+            return
 
-        # Check if there are actually failures
-        manifest_path = run_dir / "MANIFEST.json"
-        try:
-            manifest = json.loads(manifest_path.read_text())
-        except Exception:
-            manifest = {}
-
-        config_path = run_dir / "config.yaml"
-        config_text = ""
+        config_snapshot = ""
+        config_path = run_dir / "config" / "config.yaml"
         if config_path.exists():
             try:
-                config_text = config_path.read_text()
+                config_snapshot = config_path.read_text(encoding="utf-8")
             except Exception:
-                pass
+                config_snapshot = ""
 
-        # Build troubleshooting prompt
-        pipeline_name = manifest.get("pipeline_name", "Unknown")
-        provider = manifest.get("metadata", {}).get("provider", "unknown")
-        model = manifest.get("metadata", {}).get("model", "unknown")
+        template_path = Path(__file__).resolve().parents[2] / "templates" / "troubleshoot.jinja2"
+        if not template_path.exists():
+            self.notify(f"Template not found: {template_path}", severity="error")
+            return
 
-        # Gather sample failures
-        sample_failures = []
+        try:
+            template = Template(template_path.read_text(encoding="utf-8"))
+            prompt = template.render(
+                pipeline_name=manifest.get("metadata", {}).get("pipeline_name", self.run_data.pipeline_name or "Unknown"),
+                provider=manifest.get("metadata", {}).get("provider", "unknown"),
+                model=manifest.get("metadata", {}).get("model", "unknown"),
+                report_text=report.get("text", ""),
+                failure_summary=failure_summary,
+                top_errors=top_errors,
+                sample_failures=[json.dumps(sample, indent=2) for sample in sample_failures],
+                config_snapshot=config_snapshot[:5000],
+            )
+        except Exception as e:
+            self.notify(f"Failed to render troubleshoot template: {e}", severity="error")
+            return
+
+        provider_options, default_selection = self._get_troubleshoot_provider_options()
+        if not provider_options:
+            self.notify("No provider with configured API key available", severity="warning")
+            return
+
+        self.app.push_screen(
+            TroubleshootPromptModal(prompt, provider_options, default_selection),
+            callback=self._submit_troubleshoot_request,
+        )
+
+    def _collect_failure_summary(self, run_dir: Path, manifest: dict) -> tuple[dict, dict, list[dict]]:
+        """Collect per-step failure counts, top errors, and sample failures."""
+        failure_summary: dict[str, int] = {}
+        error_counters: dict[str, Counter] = {}
+        sample_failures: list[dict] = []
+
         for step_name in manifest.get("pipeline", []):
-            fail_path = run_dir / f"{step_name}_failures.jsonl"
-            if not fail_path.exists():
-                gz_path = Path(str(fail_path) + ".gz")
-                if gz_path.exists():
-                    fail_path = gz_path
-                else:
+            error_counters[step_name] = Counter()
+            for chunk_name in sorted(manifest.get("chunks", {}).keys()):
+                chunk_dir = run_dir / "chunks" / chunk_name
+                failures_path = _find_jsonl_file(chunk_dir / f"{step_name}_failures.jsonl")
+                if not failures_path:
                     continue
-            try:
-                import gzip
-                opener = gzip.open if fail_path.suffix == ".gz" else open
-                with opener(fail_path, "rt", encoding="utf-8") as f:
-                    for line in f:
-                        if len(sample_failures) >= 3:
-                            break
-                        try:
-                            sample_failures.append(json.loads(line.strip()))
-                        except json.JSONDecodeError:
-                            pass
-            except Exception:
-                pass
-            if len(sample_failures) >= 3:
-                break
+                try:
+                    with _open_jsonl(failures_path) as f:
+                        for line in f:
+                            line = line.strip()
+                            if not line:
+                                continue
+                            try:
+                                rec = json.loads(line)
+                            except json.JSONDecodeError:
+                                continue
+                            failure_summary[step_name] = failure_summary.get(step_name, 0) + 1
+                            msg = (
+                                rec.get("verification_details")
+                                or rec.get("strategy_verification_details")
+                                or rec.get("error")
+                                or rec.get("validation_error")
+                                or "Unknown validation error"
+                            )
+                            error_counters[step_name][str(msg)[:140]] += 1
+                            if len(sample_failures) < 3:
+                                sample_failures.append(rec)
+                except Exception:
+                    continue
 
-        samples_text = ""
-        if sample_failures:
-            samples_text = "\n\nSample Failed Units:\n"
-            for i, sf in enumerate(sample_failures, 1):
-                samples_text += f"\n--- Sample {i} ---\n{json.dumps(sf, indent=2)}\n"
+        top_errors = {
+            step: counter.most_common(3)
+            for step, counter in error_counters.items()
+            if counter
+        }
+        return failure_summary, top_errors, sample_failures
 
-        prompt = f"""You are an Octobatch expert. Diagnose why these units are failing and suggest fixes.
+    def _get_troubleshoot_provider_options(self) -> tuple[list[tuple[str, str]], str]:
+        """Return provider/model options, defaulting to the cheapest configured choice."""
+        from providers.base import LLMProvider
 
-Pipeline: {pipeline_name}
-Provider: {provider}
-Model: {model}
+        options: list[tuple[str, str]] = []
+        ranked: list[tuple[float, str, str, str]] = []
+        providers = LLMProvider.get_all_providers()
 
-Pipeline Report:
-{report_text}
-{samples_text}
-Config (relevant sections):
-{config_text[:3000]}
-"""
+        for provider_name, provider_info in providers.items():
+            env_var = provider_info.get("env_var", "")
+            alt_env_var = provider_info.get("alt_env_var", "")
+            has_key = bool((env_var and os.getenv(env_var)) or (alt_env_var and os.getenv(alt_env_var)))
+            if not has_key:
+                continue
 
-        # Show the prompt in a preview modal
-        self.app.push_screen(DetailModal(
-            title="Troubleshooting Prompt (Copy and send to AI)",
-            content=prompt,
-            content_type="text",
-        ))
+            models = LLMProvider.get_provider_models(provider_name)
+            if not models:
+                continue
+            cheapest_model, cheapest_info = min(
+                models.items(),
+                key=lambda item: item[1].get("input_per_million", 999999) + item[1].get("output_per_million", 999999),
+            )
+            cost_score = cheapest_info.get("input_per_million", 999999) + cheapest_info.get("output_per_million", 999999)
+            label = (
+                f"{provider_name}/{cheapest_model} "
+                f"(~${cheapest_info.get('input_per_million', 0):.2f}/${cheapest_info.get('output_per_million', 0):.2f} per 1M)"
+            )
+            value = f"{provider_name}|{cheapest_model}"
+            ranked.append((cost_score, label, value, provider_name))
+
+        ranked.sort(key=lambda item: item[0])
+        for _, label, value, _ in ranked:
+            options.append((label, value))
+
+        default_selection = ranked[0][2] if ranked else ""
+        return options, default_selection
+
+    def _submit_troubleshoot_request(self, payload: dict | None) -> None:
+        """Handle prompt modal submit and start realtime provider call."""
+        if not payload:
+            return
+        prompt = payload.get("prompt", "").strip()
+        provider = payload.get("provider", "")
+        model = payload.get("model", "")
+        if not prompt:
+            self.notify("Troubleshoot prompt is empty", severity="warning")
+            return
+        if not provider or not model:
+            self.notify("Select a provider/model", severity="warning")
+            return
+        self.notify(f"Sending troubleshooting prompt via {provider}/{model}...", severity="information")
+        self._run_troubleshoot_request(prompt, provider, model)
+
+    @work(thread=True, exclusive=True, group="troubleshoot")
+    def _run_troubleshoot_request(self, prompt: str, provider_name: str, model_name: str) -> None:
+        """Run troubleshooting prompt against selected provider in realtime."""
+        import sys
+
+        sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
+        from providers import get_provider, ProviderError
+        from ..modals import DetailModal
+
+        try:
+            provider = get_provider({"api": {"provider": provider_name, "model": model_name}})
+            result = provider.generate_realtime(prompt)
+            response_text = result.get("content", "")
+            input_tokens = result.get("input_tokens", 0)
+            output_tokens = result.get("output_tokens", 0)
+            finish_reason = result.get("finish_reason", "unknown")
+            content = (
+                f"Provider: {provider_name}/{model_name}\n"
+                f"Input tokens: {input_tokens:,}\n"
+                f"Output tokens: {output_tokens:,}\n"
+                f"Finish reason: {finish_reason}\n\n"
+                f"{response_text}"
+            )
+
+            def _show_response() -> None:
+                self.app.push_screen(
+                    DetailModal(
+                        title="AI Troubleshooting Response",
+                        content=content,
+                        content_type="text",
+                    )
+                )
+
+            self.app.call_from_thread(_show_response)
+        except ProviderError as e:
+            self.app.call_from_thread(self.notify, f"Provider error: {e}", severity="error")
+        except Exception as e:
+            self.app.call_from_thread(self.notify, f"Troubleshooting failed: {e}", severity="error")
