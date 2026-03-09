@@ -336,13 +336,15 @@ def _compute_cost(input_tokens, output_tokens, provider_name, model_name, is_rea
     return cost
 
 
-def generate_report(run_dir: Path) -> dict:
+def generate_report(run_dir: Path, failures_by: str | None = None) -> dict:
     """
     Generate a detailed run report with validation funnel, failure analysis,
     and cost summary.
 
     Args:
         run_dir: Path to the run directory
+        failures_by: Optional field name to group failures by (e.g., 'strategy_name').
+                     If None, defaults to grouping by item (unit_id prefix before __rep).
 
     Returns:
         Dict with 'text' key containing formatted report, or 'error' key on failure.
@@ -440,16 +442,26 @@ def generate_report(run_dir: Path) -> dict:
     surviving = len(expected_ids) if expected_ids else 0
     overall_yield = (surviving / total_units * 100) if total_units > 0 else 0
 
-    # Failures by item (parse item from unit_id prefix before __rep)
-    failures_by_item = {}
-    item_names = set()
+    # Failures by item or by custom field
+    failures_by_group = {}
+    group_names = set()
+    failures_by_section_title = "FAILURES BY ITEM"
+    if failures_by:
+        failures_by_section_title = f"FAILURES BY {failures_by.upper()}"
     for step_name, records in all_failures.items():
         for record in records:
-            uid = record.get("unit_id", "")
-            item = uid.rsplit("__rep", 1)[0] if "__rep" in uid else uid
-            item_names.add(item)
-            key = (step_name, item)
-            failures_by_item[key] = failures_by_item.get(key, 0) + 1
+            if failures_by:
+                group_val = record.get(failures_by)
+                if group_val is None:
+                    group_val = "(missing)"
+                else:
+                    group_val = str(group_val)
+            else:
+                uid = record.get("unit_id", "")
+                group_val = uid.rsplit("__rep", 1)[0] if "__rep" in uid else uid
+            group_names.add(group_val)
+            key = (step_name, group_val)
+            failures_by_group[key] = failures_by_group.get(key, 0) + 1
 
     # Top errors by step
     top_errors = {}
@@ -529,18 +541,18 @@ def generate_report(run_dir: Path) -> dict:
         )
     lines.append(f"  {dash}")
 
-    # Failures by item
-    if failures_by_item:
-        sorted_items = sorted(item_names)
+    # Failures by group (item or custom field)
+    if failures_by_group:
+        sorted_groups = sorted(group_names)
         lines.append("")
-        lines.append("  FAILURES BY ITEM")
+        lines.append(f"  {failures_by_section_title}")
         lines.append(f"  {dash}")
         # Header
-        item_header = f"  {'Step':<26s}"
-        for item in sorted_items:
-            item_header += f"{item:>14s}"
-        item_header += f"{'Total':>8s}"
-        lines.append(item_header)
+        group_header = f"  {'Step':<26s}"
+        for grp in sorted_groups:
+            group_header += f"{grp:>14s}"
+        group_header += f"{'Total':>8s}"
+        lines.append(group_header)
         lines.append(f"  {dash}")
 
         # Rows (only steps with failures)
@@ -548,8 +560,8 @@ def generate_report(run_dir: Path) -> dict:
             step_total = 0
             row = f"  {step_name:<26s}"
             has_failures = False
-            for item in sorted_items:
-                count = failures_by_item.get((step_name, item), 0)
+            for grp in sorted_groups:
+                count = failures_by_group.get((step_name, grp), 0)
                 step_total += count
                 row += f"{count:>14d}"
                 if count > 0:
@@ -636,3 +648,392 @@ def _format_duration(start_time: str, end_time: str) -> str:
             return f"{seconds}s"
     except (ValueError, TypeError):
         return "unknown"
+
+
+def _resolve_run_dir(run_name: str) -> Path:
+    """Resolve a short run name to a full path.
+
+    If run_name starts with 'runs/', use as-is. Otherwise prepend 'runs/'.
+    If the resulting path doesn't exist, search runs/ for a matching prefix.
+    """
+    path = Path(run_name)
+    if path.exists():
+        return path
+
+    # Try prepending runs/
+    runs_path = Path("runs") / run_name
+    if runs_path.exists():
+        return runs_path
+
+    # Search runs/ for prefix match
+    runs_dir = Path("runs")
+    if runs_dir.exists():
+        matches = [d for d in runs_dir.iterdir() if d.is_dir() and d.name.startswith(run_name)]
+        if len(matches) == 1:
+            return matches[0]
+
+    return path  # Return as-is; caller will handle non-existence
+
+
+def compare_runs(run_names: list[str]) -> dict:
+    """
+    Compare 2+ runs side by side.
+
+    Args:
+        run_names: List of run directory names or paths.
+
+    Returns:
+        Dict with 'text' key containing formatted comparison table,
+        'markdown_path' with saved file path, or 'error' key on failure.
+    """
+    if len(run_names) < 2:
+        return {"error": "At least 2 runs are required for comparison"}
+
+    registry = _load_model_registry()
+    run_data = []
+
+    for run_name in run_names:
+        run_dir = _resolve_run_dir(run_name)
+        if not run_dir.exists():
+            return {"error": f"Run directory not found: {run_name}"}
+
+        try:
+            manifest = load_manifest(run_dir)
+        except (FileNotFoundError, json.JSONDecodeError) as e:
+            return {"error": f"Cannot load manifest from {run_name}: {e}"}
+
+        metadata = manifest.get("metadata", {})
+        pipeline = manifest.get("pipeline", [])
+        chunks = manifest.get("chunks", {})
+        provider = metadata.get("provider", "unknown")
+        model = metadata.get("model", "unknown")
+        mode = metadata.get("mode", "batch")
+        is_realtime = mode == "realtime"
+        display_name = metadata.get("display_name", "")
+
+        # Count units
+        initial_ids = set()
+        for chunk_name in sorted(chunks.keys()):
+            chunk_dir = run_dir / "chunks" / chunk_name
+            units_file = chunk_dir / "units.jsonl"
+            if units_file.exists():
+                for record in load_jsonl(units_file):
+                    uid = record.get("unit_id")
+                    if uid:
+                        initial_ids.add(uid)
+
+        total_units = len(initial_ids)
+
+        # Walk pipeline to find surviving units
+        expected_ids = initial_ids.copy()
+        for step_name in pipeline:
+            valid_ids = set()
+            for chunk_name in sorted(chunks.keys()):
+                chunk_dir = run_dir / "chunks" / chunk_name
+                validated_file = chunk_dir / f"{step_name}_validated.jsonl"
+                for record in load_jsonl(validated_file):
+                    uid = record.get("unit_id")
+                    if uid:
+                        valid_ids.add(uid)
+            expected_ids = valid_ids
+
+        surviving = len(expected_ids)
+        pass_rate = (surviving / total_units * 100) if total_units > 0 else 0
+
+        # Token counts and cost
+        initial_in = metadata.get("initial_input_tokens", 0)
+        initial_out = metadata.get("initial_output_tokens", 0)
+        retry_in = metadata.get("retry_input_tokens", 0)
+        retry_out = metadata.get("retry_output_tokens", 0)
+        total_in = initial_in + retry_in
+        total_out = initial_out + retry_out
+        cost = _compute_cost(total_in, total_out, provider, model, is_realtime, registry)
+        cost_per_unit = (cost / surviving) if surviving > 0 else 0
+
+        # Read post-processing output (strategy_comparison.txt)
+        strategy_data = {}
+        strat_file = run_dir / "strategy_comparison.txt"
+        if strat_file.exists():
+            strategy_data = _parse_strategy_comparison(strat_file)
+
+        run_info = {
+            "name": display_name or run_dir.name,
+            "run_dir": str(run_dir),
+            "provider": provider,
+            "model": model,
+            "mode": mode,
+            "total_units": total_units,
+            "valid_units": surviving,
+            "pass_rate": pass_rate,
+            "cost": cost,
+            "cost_per_unit": cost_per_unit,
+            "strategy_data": strategy_data,
+        }
+        run_data.append(run_info)
+
+    # Build comparison table
+    col_width = max(18, max(len(r["name"]) + 2 for r in run_data))
+    label_width = 20
+
+    lines = []
+    lines.append("Cross-Run Comparison")
+    lines.append("=" * 20)
+    lines.append("")
+
+    # Header
+    header = f"{'':>{label_width}}"
+    for r in run_data:
+        header += f"| {r['name']:<{col_width - 2}s}"
+    lines.append(header)
+
+    sep = f"{'-' * label_width}"
+    for _ in run_data:
+        sep += f"|{'-' * (col_width - 1)}"
+    lines.append(sep)
+
+    # Rows
+    def add_row(label, values):
+        row = f"{label:<{label_width}s}"
+        for v in values:
+            row += f"| {v:<{col_width - 2}s}"
+        lines.append(row)
+
+    add_row("Provider/Model", [f"{r['provider']}/{r['model'][:col_width-len(r['provider'])-3]}" for r in run_data])
+    add_row("Mode", [r["mode"] for r in run_data])
+    add_row("Total Units", [str(r["total_units"]) for r in run_data])
+    add_row("Valid Units", [str(r["valid_units"]) for r in run_data])
+    add_row("Pass Rate", [f"{r['pass_rate']:.1f}%" for r in run_data])
+    add_row("Cost", [f"${r['cost']:.4f}" for r in run_data])
+    add_row("Cost/Valid Unit", [f"${r['cost_per_unit']:.6f}" for r in run_data])
+
+    # Strategy data (if any runs have it)
+    all_strategies = set()
+    for r in run_data:
+        all_strategies.update(r["strategy_data"].keys())
+
+    if all_strategies:
+        lines.append(sep)
+        for strat in sorted(all_strategies):
+            values = []
+            for r in run_data:
+                net = r["strategy_data"].get(strat, {}).get("net")
+                if net is not None:
+                    sign = "+" if net > 0 else ""
+                    values.append(f"{sign}{net}")
+                else:
+                    values.append("—")
+            add_row(f"{strat} Net", values)
+
+    text = "\n".join(lines)
+
+    # Save markdown file
+    from datetime import datetime, timezone
+    ts = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
+    md_path = Path(f"comparison_{ts}.md")
+    md_content = f"# {lines[0]}\n\n```\n{text}\n```\n"
+    md_path.write_text(md_content)
+
+    return {
+        "text": text,
+        "runs": run_data,
+        "markdown_path": str(md_path),
+    }
+
+
+def _parse_strategy_comparison(path: Path) -> dict:
+    """Parse a strategy_comparison.txt file into a dict of {strategy: {net: int, ...}}."""
+    result = {}
+    try:
+        lines = path.read_text().strip().split("\n")
+        for line in lines:
+            if "|" not in line or line.startswith("-") or line.startswith("Group"):
+                continue
+            parts = [p.strip() for p in line.split("|")]
+            if len(parts) < 6:
+                continue
+            name = parts[0]
+            if not name or name in ("Group", "Total:"):
+                continue
+            try:
+                net = int(parts[5])
+                result[name] = {"net": net}
+            except (ValueError, IndexError):
+                continue
+    except Exception:
+        pass
+    return result
+
+
+def compare_hands(run_dir1: Path, run_dir2: Path,
+                  unit_id: str | None = None,
+                  sample: int | None = None,
+                  step: str = "play_hand") -> dict:
+    """
+    Compare how two runs played the same dealt hands.
+
+    Given two runs with identical seeds, matches units by unit_id and
+    compares outcomes from the specified LLM step.
+
+    Args:
+        run_dir1: First run directory
+        run_dir2: Second run directory
+        unit_id: If set, show detailed comparison for this specific unit
+        sample: If set, show N random divergent pairs
+        step: Pipeline step to compare (default: play_hand)
+
+    Returns:
+        Dict with 'text' key containing formatted comparison, or 'error'.
+    """
+    run_dir1 = Path(run_dir1)
+    run_dir2 = Path(run_dir2)
+
+    for rd in [run_dir1, run_dir2]:
+        if not rd.exists():
+            return {"error": f"Run directory not found: {rd}"}
+
+    # Load validated records from the specified step
+    records1 = _load_step_records(run_dir1, step)
+    records2 = _load_step_records(run_dir2, step)
+
+    if not records1:
+        return {"error": f"No validated records found for step '{step}' in {run_dir1}"}
+    if not records2:
+        return {"error": f"No validated records found for step '{step}' in {run_dir2}"}
+
+    # Load manifests for display names
+    try:
+        m1 = load_manifest(run_dir1)
+        m2 = load_manifest(run_dir2)
+    except Exception as e:
+        return {"error": f"Cannot load manifests: {e}"}
+
+    name1 = m1.get("metadata", {}).get("display_name", "") or run_dir1.name
+    name2 = m2.get("metadata", {}).get("display_name", "") or run_dir2.name
+    model1 = m1.get("metadata", {}).get("model", "unknown")
+    model2 = m2.get("metadata", {}).get("model", "unknown")
+
+    # Match by unit_id
+    by_id1 = {r.get("unit_id"): r for r in records1 if r.get("unit_id")}
+    by_id2 = {r.get("unit_id"): r for r in records2 if r.get("unit_id")}
+
+    common_ids = sorted(set(by_id1.keys()) & set(by_id2.keys()))
+    only_in_1 = sorted(set(by_id1.keys()) - set(by_id2.keys()))
+    only_in_2 = sorted(set(by_id2.keys()) - set(by_id1.keys()))
+
+    if not common_ids:
+        return {"error": "No common unit IDs found between runs"}
+
+    # If single unit_id requested, show detailed comparison
+    if unit_id:
+        if unit_id not in by_id1 or unit_id not in by_id2:
+            return {"error": f"Unit ID '{unit_id}' not found in both runs"}
+        r1 = by_id1[unit_id]
+        r2 = by_id2[unit_id]
+        return _format_single_hand_diff(unit_id, r1, r2, name1, name2, model1, model2)
+
+    # Compare all common units
+    compare_fields = ["result", "player_final_total", "dealer_final_total",
+                      "first_action", "player_busted", "dealer_busted"]
+    divergent = []
+    identical = []
+
+    for uid in common_ids:
+        r1 = by_id1[uid]
+        r2 = by_id2[uid]
+        diffs = {}
+        for field in compare_fields:
+            v1 = r1.get(field)
+            v2 = r2.get(field)
+            if v1 != v2:
+                diffs[field] = (v1, v2)
+        if diffs:
+            divergent.append({"unit_id": uid, "diffs": diffs})
+        else:
+            identical.append(uid)
+
+    # Build output
+    lines = []
+    lines.append(f"Hand-by-Hand Comparison: {step}")
+    lines.append("=" * 60)
+    lines.append(f"  Run 1: {name1} ({model1})")
+    lines.append(f"  Run 2: {name2} ({model2})")
+    lines.append(f"  Common units: {len(common_ids)}")
+    lines.append(f"  Identical: {len(identical)}")
+    lines.append(f"  Divergent: {len(divergent)}")
+    if only_in_1:
+        lines.append(f"  Only in Run 1: {len(only_in_1)}")
+    if only_in_2:
+        lines.append(f"  Only in Run 2: {len(only_in_2)}")
+    lines.append("")
+
+    # Show divergent pairs
+    show_list = divergent
+    if sample and sample < len(divergent):
+        import random
+        show_list = random.sample(divergent, sample)
+
+    if show_list:
+        lines.append("DIVERGENT HANDS")
+        lines.append("-" * 60)
+        for entry in show_list:
+            uid = entry["unit_id"]
+            lines.append(f"  {uid}:")
+            for field, (v1, v2) in entry["diffs"].items():
+                lines.append(f"    {field}: {v1} vs {v2}")
+        lines.append("")
+
+    text = "\n".join(lines)
+
+    return {
+        "text": text,
+        "common_count": len(common_ids),
+        "identical_count": len(identical),
+        "divergent_count": len(divergent),
+        "divergent": divergent[:100],  # Cap for programmatic use
+        "only_in_run1": only_in_1[:50],
+        "only_in_run2": only_in_2[:50],
+    }
+
+
+def _load_step_records(run_dir: Path, step_name: str) -> list[dict]:
+    """Load all validated records for a given step from all chunks."""
+    try:
+        manifest = load_manifest(run_dir)
+    except Exception:
+        return []
+
+    chunks = manifest.get("chunks", {})
+    records = []
+    for chunk_name in sorted(chunks.keys()):
+        chunk_dir = run_dir / "chunks" / chunk_name
+        validated_file = chunk_dir / f"{step_name}_validated.jsonl"
+        for record in load_jsonl(validated_file):
+            records.append(record)
+    return records
+
+
+def _format_single_hand_diff(unit_id, r1, r2, name1, name2, model1, model2):
+    """Format a detailed comparison of a single unit across two runs."""
+    lines = []
+    lines.append(f"Detailed Comparison: {unit_id}")
+    lines.append("=" * 60)
+    lines.append(f"  Run 1: {name1} ({model1})")
+    lines.append(f"  Run 2: {name2} ({model2})")
+    lines.append("")
+
+    # Get all fields from both records
+    all_fields = sorted(set(list(r1.keys()) + list(r2.keys())))
+
+    lines.append(f"  {'Field':<30s}{'Run 1':<25s}{'Run 2':<25s}{'Match':<6s}")
+    lines.append(f"  {'-' * 86}")
+
+    for field in all_fields:
+        v1 = r1.get(field)
+        v2 = r2.get(field)
+        v1_str = str(v1)[:22] if v1 is not None else "—"
+        v2_str = str(v2)[:22] if v2 is not None else "—"
+        match = "✓" if v1 == v2 else "✗"
+        lines.append(f"  {field:<30s}{v1_str:<25s}{v2_str:<25s}{match}")
+
+    text = "\n".join(lines)
+    return {"text": text, "unit_id": unit_id, "run1": r1, "run2": r2}

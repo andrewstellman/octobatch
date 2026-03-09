@@ -6394,7 +6394,8 @@ def _handle_report(args):
     from run_tools import generate_report
 
     run_dir = args.run_dir
-    report = generate_report(run_dir)
+    failures_by = getattr(args, 'failures_by', None)
+    report = generate_report(run_dir, failures_by=failures_by)
 
     if report.get("error"):
         print(f"Error: {report['error']}", file=sys.stderr)
@@ -6405,6 +6406,28 @@ def _handle_report(args):
         return
 
     print(report["text"])
+
+
+def _handle_compare(args):
+    """Handle --compare: cross-run comparison."""
+    from run_tools import compare_runs
+
+    result = compare_runs(args.compare)
+
+    if result.get("error"):
+        print(f"Error: {result['error']}", file=sys.stderr)
+        sys.exit(1)
+
+    if getattr(args, 'json', False):
+        print(json.dumps(result, indent=2, default=str))
+        return
+
+    print(result["text"])
+
+    # Save markdown file
+    md_path = result.get("markdown_path")
+    if md_path:
+        print(f"\nSaved to: {md_path}")
 
 
 def _handle_name(args):
@@ -6650,6 +6673,12 @@ def main():
         action="store_true",
         help="Generate a detailed run report (validation funnel, failures, cost)"
     )
+    mode_group.add_argument(
+        "--compare",
+        nargs="+",
+        metavar="RUN",
+        help="Compare 2+ runs side by side (e.g., --compare run1 run2 run3)"
+    )
 
     # Output format
     parser.add_argument(
@@ -6740,6 +6769,14 @@ def main():
         help="Human-readable display name for the run (used with --init or --run-dir)"
     )
 
+    # Failure breakdown field (used with --report)
+    parser.add_argument(
+        "--failures-by",
+        type=str,
+        dest="failures_by",
+        help="Group failures by this field in the report (e.g., strategy_name, difficulty)"
+    )
+
     # Re-validation options
     parser.add_argument(
         "--step",
@@ -6762,13 +6799,18 @@ def main():
     has_mode = any([args.init, args.tick, args.status, args.watch,
                     args.retry_failures, args.validate_config, args.realtime,
                     args.revalidate, args.ps, args.info, args.verify, args.repair,
-                    args.restart, args.report, args.name])
+                    args.restart, args.report, args.name, args.compare])
     if not has_mode:
-        parser.error("One of --init, --tick, --status, --watch, --retry-failures, --validate-config, --revalidate, --realtime, --ps, --info, --verify, --repair, --restart, --report, or --name is required")
+        parser.error("One of --init, --tick, --status, --watch, --retry-failures, --validate-config, --revalidate, --realtime, --ps, --info, --verify, --repair, --restart, --report, --compare, or --name is required")
 
     # Handle --ps (doesn't need --run-dir)
     if args.ps:
         _handle_ps(args)
+        sys.exit(0)
+
+    # Handle --compare (doesn't need --run-dir)
+    if args.compare:
+        _handle_compare(args)
         sys.exit(0)
 
     # Handle --validate-config (doesn't need --run-dir)
@@ -6780,7 +6822,7 @@ def main():
         sys.exit(0 if result["valid"] else 1)
 
     # All other operations require --run-dir
-    if not args.run_dir and not args.ps:
+    if not args.run_dir and not args.ps and not args.compare:
         parser.error("--run-dir is required for this operation")
 
     # Handle --info
