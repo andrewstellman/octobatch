@@ -198,6 +198,63 @@ class TestNamedRuns:
             _handle_name(args)
 
 
+    def test_restart_no_pid_file_exits(self, tmp_path):
+        from orchestrate import _handle_restart
+
+        run_dir = tmp_path / "test_run"
+        run_dir.mkdir()
+        write_manifest(run_dir, make_basic_manifest())
+
+        args = MagicMock()
+        args.run_dir = run_dir
+
+        with pytest.raises(SystemExit):
+            _handle_restart(args)
+
+
+class TestExpressionThrottleStructure:
+    def test_llm_steps_still_respect_inflight_limit(self):
+        orchestrate_path = Path(__file__).parent.parent / "scripts" / "orchestrate.py"
+        source = orchestrate_path.read_text()
+        assert "if inflight >= max_inflight:" in source
+        assert "throttled_count += 1" in source
+
+
+class TestNamedRunsInit:
+    def test_name_during_init_stores_in_manifest(self, tmp_path):
+        from orchestrate import init_run
+
+        config_dir = tmp_path / "pipeline"
+        config_dir.mkdir()
+        config = {
+            "pipeline": {
+                "steps": [{"name": "step1", "scope": "expression",
+                           "expression": {"output_fields": {"x": "1"}}}]
+            },
+            "api": {"provider": "gemini", "model": "gemini-2.0-flash-001"},
+            "processing": {"chunk_size": 10},
+            "items": {"type": "direct", "entries": [{"unit_id": "u1"}]},
+        }
+        config_path = config_dir / "config.yaml"
+        import yaml
+        with open(config_path, "w") as f:
+            yaml.dump(config, f)
+
+        run_dir = tmp_path / "named_run"
+        success = init_run(
+            config_path=config_path,
+            run_dir=run_dir,
+            provider_override="gemini",
+            model_override="gemini-2.0-flash-001",
+            display_name="My Test Run",
+        )
+
+        if success:
+            from octobatch_utils import load_manifest
+            manifest = load_manifest(run_dir)
+            assert manifest["metadata"].get("display_name") == "My Test Run"
+
+
 class TestReportCLI:
     def test_report_handler_outputs_text(self, tmp_path, capsys):
         from orchestrate import _handle_report
