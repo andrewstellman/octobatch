@@ -956,6 +956,8 @@ def retry_validation_failures(run_dir: Path, manifest: dict, log_file: Path, max
             # failures in place as permanent (they'll be counted as hard failures).
             if config and is_expression_step(config, step):
                 continue
+            if config and is_fan_out_step(config, step):
+                continue
             failures_file = chunk_dir / f"{step}_failures.jsonl"
             if not failures_file.exists():
                 continue
@@ -2728,6 +2730,43 @@ def tick_run(run_dir: Path, max_retries: int = 5) -> dict:
 
                 continue  # Skip API batch submission for expression steps
 
+            # Check if this is a fan-out step (no API call needed)
+            if is_fan_out_step(config, step):
+                fan_out_config = get_fan_out_step_config(config, step)
+                log_message(log_file, "FAN_OUT", f"{chunk_name}: Running fan-out step '{step}' locally")
+
+                try:
+                    valid, _, _, _ = run_fan_out_step(
+                        run_dir, chunk_name, step, fan_out_config, config, manifest, log_file
+                    )
+
+                    chunk_data["valid"] = valid
+                    chunk_data["failed"] = 0
+
+                    if valid == 0:
+                        log_message(log_file, "STOP", f"{chunk_name}: Fan-out step {step} produced 0 children. Marking chunk as FAILED.")
+                        chunk_data["state"] = "FAILED"
+                        chunk_data["retries"] = max_retries
+                        failed += 1
+                        save_manifest(run_dir, manifest)
+                    else:
+                        next_step = get_next_step(pipeline, step)
+                        if next_step:
+                            chunk_data["state"] = f"{next_step}_PENDING"
+                            log_message(log_file, "FAN_OUT", f"{chunk_name}: {step} complete ({valid} children) -> {next_step}_PENDING")
+                        else:
+                            chunk_data["state"] = "VALIDATED"
+                            log_message(log_file, "FAN_OUT", f"{chunk_name}: {step} complete ({valid} children) -> VALIDATED")
+                            completed += 1
+
+                        save_manifest(run_dir, manifest)
+
+                except Exception as e:
+                    log_message(log_file, "ERROR", f"{chunk_name}: Fan-out step '{step}' failed: {e}")
+                    errors += 1
+
+                continue  # Skip API batch submission for fan-out steps
+
             if inflight >= max_inflight:
                 throttled_count += 1
                 continue
@@ -4288,6 +4327,95 @@ def run_expression_step(
     return (valid_count, failed_count, 0, 0)
 
 
+def run_fan_out_step(
+    run_dir: Path,
+    chunk_name: str,
+    step: str,
+    step_config: dict,
+    config: dict,
+    manifest: dict,
+    log_file: Path,
+) -> tuple[int, int, int, int]:
+    """
+    Run a fan-out step that expands an array field into individual child units.
+
+    For each parent unit, reads the array field specified by step_config['field'],
+    and creates one child unit per array element. Child units inherit all parent
+    fields plus the individual element in step_config['child_field'].
+
+    Fan-out is deterministic — no failure mode. All children are written as validated.
+
+    Returns:
+        Tuple of (child_count, 0, 0, 0) — no failures, no tokens
+    """
+    field_name = step_config.get("field")
+    child_field = step_config.get("child_field", field_name)
+
+    if not field_name:
+        log_message(log_file, "ERROR", f"{chunk_name}/{step}: Fan-out step missing 'field' config")
+        return (0, 0, 0, 0)
+
+    chunk_dir = run_dir / "chunks" / chunk_name
+    pipeline = manifest["pipeline"]
+
+    # Determine input file
+    step_idx = pipeline.index(step) if step in pipeline else 0
+    if step_idx == 0:
+        input_file = chunk_dir / "units.jsonl"
+    else:
+        prev_step = pipeline[step_idx - 1]
+        input_file = chunk_dir / f"{prev_step}_validated.jsonl"
+
+    if not input_file.exists():
+        log_message(log_file, "WARN", f"{chunk_name}/{step}: Input file not found: {input_file}")
+        return (0, 0, 0, 0)
+
+    # Load input units
+    units = []
+    with open(input_file) as f:
+        for line in f:
+            line = line.strip()
+            if line:
+                try:
+                    units.append(json.loads(line))
+                except json.JSONDecodeError:
+                    continue
+
+    if not units:
+        log_message(log_file, "WARN", f"{chunk_name}/{step}: No input units")
+        return (0, 0, 0, 0)
+
+    # Create child units from array field
+    child_units = []
+    for unit in units:
+        parent_id = unit.get("unit_id", "unknown")
+        array_val = unit.get(field_name, [])
+
+        if not isinstance(array_val, list):
+            log_message(log_file, "WARN", f"{chunk_name}/{step}: Unit {parent_id} field '{field_name}' is not an array, skipping")
+            continue
+
+        for idx, element in enumerate(array_val):
+            child = unit.copy()
+            child["unit_id"] = f"{parent_id}__fan{idx:03d}"
+            child[child_field] = element
+            child["_fan_index"] = idx
+            child["_fan_parent_id"] = parent_id
+            child_units.append(child)
+
+    # Write fan-out output as validated (no failure mode)
+    validated_file = chunk_dir / f"{step}_validated.jsonl"
+    with open(validated_file, 'w') as f:
+        for child in child_units:
+            f.write(json.dumps(child) + "\n")
+
+    child_count = len(child_units)
+    parent_count = len(units)
+    log_message(log_file, "FAN_OUT", f"{chunk_name}/{step}: {child_count} children from {parent_count} parents")
+
+    return (child_count, 0, 0, 0)
+
+
 def is_expression_step(config: dict, step_name: str) -> bool:
     """Check if a step is an expression-only step (scope: expression)."""
     steps = config.get("pipeline", {}).get("steps", [])
@@ -4302,6 +4430,24 @@ def get_expression_step_config(config: dict, step_name: str) -> dict | None:
     steps = config.get("pipeline", {}).get("steps", [])
     for step in steps:
         if step.get("name") == step_name and step.get("scope") == "expression":
+            return step
+    return None
+
+
+def is_fan_out_step(config: dict, step_name: str) -> bool:
+    """Check if a step is a fan-out step (scope: fan_out)."""
+    steps = config.get("pipeline", {}).get("steps", [])
+    for step in steps:
+        if step.get("name") == step_name:
+            return step.get("scope") == "fan_out"
+    return False
+
+
+def get_fan_out_step_config(config: dict, step_name: str) -> dict | None:
+    """Get the full config dict for a fan-out step."""
+    steps = config.get("pipeline", {}).get("steps", [])
+    for step in steps:
+        if step.get("name") == step_name and step.get("scope") == "fan_out":
             return step
     return None
 
@@ -5390,6 +5536,33 @@ def realtime_run(
                             return False  # Signal run_realtime to stop processing remaining units
 
                 for chunk_name in chunks_for_step:
+                    # Check if this is a fan-out step (no LLM call)
+                    if is_fan_out_step(config, step):
+                        fan_out_config = get_fan_out_step_config(config, step)
+
+                        valid, _, _, _ = run_fan_out_step(
+                            run_dir, chunk_name, step, fan_out_config, config, manifest, log_file
+                        )
+
+                        chunk_data = manifest["chunks"][chunk_name]
+                        chunk_data["valid"] = valid
+                        chunk_data["failed"] = 0
+
+                        if valid == 0:
+                            log_message(log_file, "STOP", f"{chunk_name}: Fan-out step {step} produced 0 children. Marking chunk as FAILED.")
+                            chunk_data["state"] = "FAILED"
+                            chunk_data["retries"] = max_retries
+                        else:
+                            next_step = get_next_step(pipeline, step)
+                            if next_step:
+                                chunk_data["state"] = f"{next_step}_PENDING"
+                            else:
+                                chunk_data["state"] = "VALIDATED"
+
+                        step_valid += valid
+                        save_manifest(run_dir, manifest)
+                        continue
+
                     # Check if this is an expression-only step (no LLM call)
                     if is_expression_step(config, step):
                         step_config = get_expression_step_config(config, step)
@@ -5537,6 +5710,10 @@ def realtime_run(
                 if exhausted_total > 0:
                     time_str = datetime.now().strftime("%H:%M:%S")
                     print(f"[{time_str}] {step}: fast-fail enabled for expression scope ({exhausted_total} exhausted)", flush=True)
+                continue
+
+            # Fan-out steps have no failures and no retries.
+            if is_fan_out_step(config, step):
                 continue
 
             # Run retries for this step (whether we just ran it or it's from a previous run)

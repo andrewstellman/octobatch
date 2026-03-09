@@ -45,6 +45,18 @@ def verify_run(run_dir: Path) -> dict:
     if not pipeline:
         return {"error": "No pipeline steps found in manifest"}
 
+    # Load config to detect fan-out steps
+    fan_out_steps = set()
+    config_path = run_dir / "config" / "config.yaml"
+    if config_path.exists():
+        try:
+            config = yaml.safe_load(config_path.read_text())
+            for step_def in config.get("pipeline", {}).get("steps", []):
+                if step_def.get("scope") == "fan_out":
+                    fan_out_steps.add(step_def["name"])
+        except Exception:
+            pass
+
     # Get initial unit IDs from chunk unit files
     initial_ids = set()
     for chunk_name in sorted(chunks.keys()):
@@ -69,6 +81,32 @@ def verify_run(run_dir: Path) -> dict:
     expected_ids = initial_ids.copy()
 
     for step_idx, step_name in enumerate(pipeline):
+        if step_name in fan_out_steps:
+            # Fan-out steps produce child IDs, not matching parent IDs.
+            # Collect all valid IDs from fan-out output as the new expected set.
+            valid_ids = set()
+            for chunk_name_iter in sorted(chunks.keys()):
+                chunk_dir = run_dir / "chunks" / chunk_name_iter
+                validated_file = chunk_dir / f"{step_name}_validated.jsonl"
+                for record in load_jsonl(validated_file):
+                    uid = record.get("unit_id")
+                    if uid:
+                        valid_ids.add(uid)
+            step_report = {
+                "step": step_name,
+                "scope": "fan_out",
+                "expected": len(expected_ids),
+                "valid": len(valid_ids),
+                "failed": 0,
+                "missing": 0,
+                "duplicated": 0,
+                "orphaned": 0,
+                "_valid_ids": valid_ids,
+            }
+            result["steps"].append(step_report)
+            expected_ids = valid_ids
+            continue
+
         step_report = _verify_step(
             run_dir, step_name, chunks, expected_ids
         )
@@ -391,6 +429,18 @@ def generate_report(run_dir: Path, failures_by: str | None = None) -> dict:
 
     total_units = len(initial_ids)
 
+    # Load config to detect fan-out steps
+    fan_out_steps = set()
+    config_path = run_dir / "config" / "config.yaml"
+    if config_path.exists():
+        try:
+            run_config = yaml.safe_load(config_path.read_text())
+            for step_def in run_config.get("pipeline", {}).get("steps", []):
+                if step_def.get("scope") == "fan_out":
+                    fan_out_steps.add(step_def["name"])
+        except Exception:
+            pass
+
     # Build validation funnel per step
     funnel = []
     expected_ids = initial_ids.copy()
@@ -419,24 +469,42 @@ def generate_report(run_dir: Path, failures_by: str | None = None) -> dict:
 
         valid_count = len(valid_ids)
         failed_count = len(failed_ids)
-        cumulative_lost = total_units - valid_count if total_units > 0 else 0
-        pass_pct = (valid_count / len(expected_ids) * 100) if expected_ids else 0
-        yield_pct = (valid_count / total_units * 100) if total_units > 0 else 0
 
-        funnel.append({
-            "step": step_name,
-            "valid": valid_count,
-            "failed": failed_count,
-            "lost": cumulative_lost,
-            "total": len(expected_ids),
-            "pass_pct": pass_pct,
-            "yield_pct": yield_pct,
-        })
+        if step_name in fan_out_steps:
+            # Fan-out steps: show expansion boundary
+            funnel.append({
+                "step": step_name,
+                "scope": "fan_out",
+                "valid": valid_count,
+                "failed": 0,
+                "lost": 0,
+                "total": len(expected_ids),
+                "pass_pct": 0,
+                "yield_pct": 0,
+                "parent_count": len(expected_ids),
+            })
+            # After fan-out, total_units resets to child count for yield calculation
+            total_units = valid_count
+            expected_ids = valid_ids.copy()
+        else:
+            cumulative_lost = total_units - valid_count if total_units > 0 else 0
+            pass_pct = (valid_count / len(expected_ids) * 100) if expected_ids else 0
+            yield_pct = (valid_count / total_units * 100) if total_units > 0 else 0
 
-        if failure_records:
-            all_failures[step_name] = failure_records
+            funnel.append({
+                "step": step_name,
+                "valid": valid_count,
+                "failed": failed_count,
+                "lost": cumulative_lost,
+                "total": len(expected_ids),
+                "pass_pct": pass_pct,
+                "yield_pct": yield_pct,
+            })
 
-        expected_ids = valid_ids.copy()
+            if failure_records:
+                all_failures[step_name] = failure_records
+
+            expected_ids = valid_ids.copy()
 
     # Final surviving units
     surviving = len(expected_ids) if expected_ids else 0
@@ -530,15 +598,22 @@ def generate_report(run_dir: Path, failures_by: str | None = None) -> dict:
     lines.append(f"  {'Step':<26s}{'Valid':>6s}{'Failed':>8s}{'Lost':>7s}{'Total':>8s}{'Pass %':>8s}{'Yield':>8s}")
     lines.append(f"  {dash}")
     for entry in funnel:
-        lines.append(
-            f"  {entry['step']:<26s}"
-            f"{entry['valid']:>6d}"
-            f"{entry['failed']:>8d}"
-            f"{entry['lost']:>7d}"
-            f"{entry['total']:>8d}"
-            f"{entry['pass_pct']:>7.1f}%"
-            f"{entry['yield_pct']:>7.1f}%"
-        )
+        if entry.get("scope") == "fan_out":
+            parent_count = entry.get("parent_count", 0)
+            lines.append(
+                f"  {entry['step']:<26s}"
+                f"{entry['valid']:>6d} units created from {parent_count} parents"
+            )
+        else:
+            lines.append(
+                f"  {entry['step']:<26s}"
+                f"{entry['valid']:>6d}"
+                f"{entry['failed']:>8d}"
+                f"{entry['lost']:>7d}"
+                f"{entry['total']:>8d}"
+                f"{entry['pass_pct']:>7.1f}%"
+                f"{entry['yield_pct']:>7.1f}%"
+            )
     lines.append(f"  {dash}")
 
     # Failures by group (item or custom field)

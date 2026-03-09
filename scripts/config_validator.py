@@ -58,7 +58,7 @@ def validate_config(config: dict) -> list[str]:
         errors.append("'pipeline.steps' is empty")
     else:
         # Check each step has a name and valid scope
-        valid_scopes = ("chunk", "run", "expression")
+        valid_scopes = ("chunk", "run", "expression", "fan_out")
         for i, step in enumerate(config["pipeline"]["steps"]):
             if "name" not in step:
                 errors.append(f"Pipeline step {i} missing 'name'")
@@ -173,7 +173,7 @@ def get_chunk_scope_steps(config: dict) -> list[str]:
     steps = config.get("pipeline", {}).get("steps", [])
     return [
         step["name"] for step in steps
-        if "name" in step and step.get("scope", "chunk") in ("chunk", "expression")
+        if "name" in step and step.get("scope", "chunk") in ("chunk", "expression", "fan_out")
     ]
 
 
