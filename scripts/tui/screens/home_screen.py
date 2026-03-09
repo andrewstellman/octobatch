@@ -77,6 +77,14 @@ class HomeScreen(Screen):
         Binding("H", "toggle_archived", "Archived", show=False),
         Binding("ctrl+r", "refresh", "Refresh", show=False),
         Binding("f5", "refresh", "Refresh", show=False),
+        # Named runs
+        Binding("b", "name_run", "Name"),
+        Binding("B", "name_run", "Name", show=False),
+        # Cross-run comparison
+        Binding("c", "compare_runs", "Compare"),
+        Binding("C", "compare_runs", "Compare", show=False),
+        # Multi-select toggle
+        Binding("space", "toggle_select", "Select", show=False),
     ]
 
     CSS = """
@@ -158,6 +166,7 @@ class HomeScreen(Screen):
         self._running_row_starts: dict[str, datetime] = {}  # row_key -> started_at for duration ticker
         self._batch_wait_toasts_shown: set[str] = set()  # run names that got the queue toast
         self._show_archived: bool = False
+        self._selected_runs: set[int] = set()  # indices of multi-selected runs for comparison
 
     def _render_header(self) -> str:
         """Render header with version and resource stats on the right."""
@@ -719,10 +728,14 @@ class HomeScreen(Screen):
 
         for i, run in enumerate(self._sorted_runs):
             symbol = self._get_status_symbol(run)
-            name = run['name']
+            # Show display_name if available, otherwise run name
+            display_name = run.get('display_name') or run['name']
+            name = display_name
             if len(name) > 28:
                 name = name[:25] + "..."
-            if run.get("is_archived"):
+            if i in self._selected_runs:
+                name = f"[bold cyan]* {name}[/]"
+            elif run.get("is_archived"):
                 name = f"[dim]📦 {name}[/]"
             progress = f"{run['progress']}%"
             total_units = run.get('total_units', 0)
@@ -1105,7 +1118,8 @@ class HomeScreen(Screen):
     def _render_footer(self) -> str:
         """Render footer with key bindings."""
         archive_label = "H:hide archived" if self._show_archived else "H:show archived"
-        return f"N:new  Enter:open  X:archive  P:pause  R:resume/retry  K:kill  {archive_label}  L:pipelines  Q:quit"
+        select_hint = f"  [{len(self._selected_runs)} sel]" if self._selected_runs else ""
+        return f"N:new  Enter:open  B:name  Space:sel  C:compare{select_hint}  X:archive  P:pause  R:resume  K:kill  {archive_label}  Q:quit"
 
     # --- Helpers ---
 
@@ -1435,9 +1449,17 @@ class HomeScreen(Screen):
         health = get_process_health(run_dir)
         _log.debug(f"Resume: status={manifest_status}, health={health}")
 
-        # Case 1: Healthy running process - nothing to do
+        # Case 1: Healthy running process - offer restart
         if health["status"] == "running":
-            self.app.notify("Run is already running")
+            from .modals import ConfirmModal
+            pid = health.get("pid", "?")
+            self.app.push_screen(
+                ConfirmModal(
+                    f"Run is active (PID {pid}). Restart?",
+                    "This will kill the current process and relaunch.",
+                ),
+                callback=lambda confirmed: self._handle_restart_confirm(confirmed, run_dir, mode, pid),
+            )
             return
 
         # Case 2: Hung process - kill first, then restart
@@ -1592,3 +1614,147 @@ class HomeScreen(Screen):
                 tmp_path.rename(manifest_path)
             except Exception as e:
                 _log.debug(f"Failed to update manifest for restart: {e}")
+
+    def _handle_restart_confirm(self, confirmed: bool, run_dir: Path, mode: str, pid: int) -> None:
+        """Handle restart confirmation for a running process."""
+        if not confirmed:
+            return
+
+        import time
+
+        try:
+            os.kill(pid, signal.SIGTERM)
+            time.sleep(1.0)
+            try:
+                os.kill(pid, 0)
+                os.kill(pid, signal.SIGKILL)
+                time.sleep(0.5)
+            except ProcessLookupError:
+                pass
+        except ProcessLookupError:
+            pass
+        except Exception as e:
+            self.app.notify(f"Failed to kill process: {e}", severity="error")
+            return
+
+        pid_file = run_dir / "orchestrator.pid"
+        if pid_file.exists():
+            try:
+                pid_file.unlink()
+            except Exception:
+                pass
+
+        self._update_manifest_for_restart(run_dir)
+        self._start_orchestrator(run_dir, mode)
+        self.app.notify("Run restarted")
+
+    def action_name_run(self) -> None:
+        """Set or edit display name for a run (B key)."""
+        run = self._get_selected_run()
+        if not run:
+            self.app.notify("No run selected", severity="warning")
+            return
+
+        current_name = run.get('display_name') or ""
+
+        from .modals import TextInputModal
+        self.app.push_screen(
+            TextInputModal(
+                title="Set Run Display Name",
+                default=current_name,
+                placeholder="Enter display name...",
+            ),
+            callback=lambda result: self._apply_run_name(result, run),
+        )
+
+    def _apply_run_name(self, name: str | None, run: dict) -> None:
+        """Apply the display name to the manifest."""
+        if name is None:
+            return
+
+        run_dir = Path(run.get('path', ''))
+        manifest_path = run_dir / "MANIFEST.json"
+
+        if not manifest_path.exists():
+            self.app.notify("Manifest not found", severity="error")
+            return
+
+        try:
+            manifest = json.loads(manifest_path.read_text())
+            if "metadata" not in manifest:
+                manifest["metadata"] = {}
+
+            name = name.strip()
+            if name:
+                manifest["metadata"]["display_name"] = name
+            else:
+                manifest["metadata"].pop("display_name", None)
+
+            tmp_path = manifest_path.with_suffix(".tmp")
+            tmp_path.write_text(json.dumps(manifest, indent=2))
+            tmp_path.rename(manifest_path)
+
+            self.app.notify(f"Display name set to '{name}'" if name else "Display name cleared")
+            self._start_background_scan()
+        except Exception as e:
+            self.app.notify(f"Failed to set name: {e}", severity="error")
+
+    def action_toggle_select(self) -> None:
+        """Toggle multi-selection of a run for comparison (Space key)."""
+        try:
+            table = self.query_one("#runs-table", DataTable)
+            row_index = table.cursor_row
+        except NoMatches:
+            return
+
+        if row_index < 0 or row_index >= len(self._sorted_runs):
+            return
+
+        if row_index in self._selected_runs:
+            self._selected_runs.discard(row_index)
+        else:
+            self._selected_runs.add(row_index)
+
+        self._populate_runs_content()
+        self.app.notify(f"{len(self._selected_runs)} runs selected")
+
+    def action_compare_runs(self) -> None:
+        """Compare selected runs (C key)."""
+        import sys
+        sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
+        from run_tools import compare_runs
+
+        if len(self._selected_runs) < 2:
+            self.app.notify("Select at least 2 runs with Space, then press C", severity="warning")
+            return
+
+        run_names = []
+        for idx in sorted(self._selected_runs):
+            if idx < len(self._sorted_runs):
+                run = self._sorted_runs[idx]
+                run_names.append(str(run.get('path', '')))
+
+        if len(run_names) < 2:
+            self.app.notify("Not enough valid runs selected", severity="warning")
+            return
+
+        try:
+            result = compare_runs(run_names)
+            if result.get("error"):
+                self.app.notify(f"Comparison error: {result['error']}", severity="error")
+                return
+
+            content = result.get("text", "(empty comparison)")
+
+            from ..modals import DetailModal
+            self.app.push_screen(DetailModal(
+                title="Cross-Run Comparison",
+                content=content,
+                content_type="text",
+            ))
+
+            # Clear selection after showing comparison
+            self._selected_runs.clear()
+            self._populate_runs_content()
+        except Exception as e:
+            self.app.notify(f"Comparison failed: {e}", severity="error")

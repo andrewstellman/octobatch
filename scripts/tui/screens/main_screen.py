@@ -492,6 +492,18 @@ class MainScreen(Screen):
         # Archive run
         Binding("x", "archive_run", "Archive"),
         Binding("X", "archive_run", "Archive", show=False),
+        # Pipeline report
+        Binding("g", "pipeline_report", "Report"),
+        Binding("G", "pipeline_report", "Report", show=False),
+        # Mode switch (batch↔realtime)
+        Binding("m", "mode_switch", "Mode", show=False),
+        Binding("M", "mode_switch", "Mode", show=False),
+        # Intermediate results (post-processing)
+        Binding("p", "intermediate_results", "Preview", show=False),
+        Binding("P", "intermediate_results", "Preview", show=False),
+        # AI troubleshooting
+        Binding("t", "troubleshoot", "Troubleshoot", show=False),
+        Binding("T", "troubleshoot", "Troubleshoot", show=False),
     ]
 
     CSS = """
@@ -1344,9 +1356,9 @@ class MainScreen(Screen):
         """Render the footer with key bindings based on current view."""
         if self.current_view == "chunk":
             if self.active_focus == "pipeline":
-                return "←→:step  ↑↓:panel  V:units  X:archive  A:files  D:diag  I:info  L:log  Esc:back  Q:quit"
+                return "←→:step  ↑↓:panel  V:units  G:report  A:files  D:diag  I:info  L:log  Esc:back  Q:quit"
             else:
-                return "←→:step  ↑↓:chunk  Enter:details  V:units  X:archive  A:files  D:diag  I:info  L:log  Esc:back  Q:quit"
+                return "←→:step  ↑↓:chunk  Enter:details  V:units  G:report  A:files  D:diag  I:info  L:log  Esc:back  Q:quit"
         else:
             # Unit view - show filter/sort state
             status_label = f"F:{self.status_filter[:3]}"
@@ -1359,7 +1371,7 @@ class MainScreen(Screen):
                 and u.get("failure_stage", "validation") in _val_stages
             )
             retry_hint = f"R:retry({retryable_count})" if retryable_count > 0 else ""
-            return f"←→:step  ↑↓:select  Enter:detail  {status_label}  {sort_label}  {retry_hint}  X:archive  A:files  D:diag  V:chunks  I:info  Esc:back  Q:quit"
+            return f"←→:step  ↑↓:select  Enter:detail  {status_label}  {sort_label}  {retry_hint}  G:report  T:troubleshoot  A:files  D:diag  V:chunks  Esc:back  Q:quit"
 
     # --- Unit Data Loading ---
 
@@ -3116,3 +3128,253 @@ Sort (S):      {self.sort_by}
         """Open the Diagnostics Screen for interactive failure analysis."""
         from .diagnostics_screen import DiagnosticsScreen
         self.app.push_screen(DiagnosticsScreen(self.run_data.run_dir))
+
+    def action_pipeline_report(self) -> None:
+        """Generate and display pipeline report in a modal (G key)."""
+        import sys
+        sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
+        from run_tools import generate_report
+        from ..modals import DetailModal
+
+        run_dir = self.run_data.run_dir
+        try:
+            result = generate_report(run_dir)
+            if result.get("error"):
+                self.notify(f"Report error: {result['error']}", severity="error")
+                return
+            content = result.get("text", "(empty report)")
+            self.app.push_screen(DetailModal(
+                title="Pipeline Report",
+                content=content,
+                content_type="text",
+            ))
+        except Exception as e:
+            self.notify(f"Failed to generate report: {e}", severity="error")
+
+    def action_mode_switch(self) -> None:
+        """Schedule a mode switch between batch and realtime (M key)."""
+        run_dir = self.run_data.run_dir
+        manifest_path = run_dir / "MANIFEST.json"
+
+        try:
+            manifest = json.loads(manifest_path.read_text())
+        except Exception as e:
+            self.notify(f"Cannot read manifest: {e}", severity="error")
+            return
+
+        status = manifest.get("status", "")
+        if status not in ("paused", "detached"):
+            self.notify("Mode switch only available for paused runs", severity="warning")
+            return
+
+        current_mode = manifest.get("metadata", {}).get("mode", "batch")
+        new_mode = "realtime" if current_mode == "batch" else "batch"
+
+        from .modals import ConfirmModal
+        self.app.push_screen(
+            ConfirmModal(
+                f"Switch from {current_mode} to {new_mode}?",
+                "Outstanding batch chunks will complete first.",
+            ),
+            callback=lambda confirmed: self._apply_mode_switch(confirmed, new_mode),
+        )
+
+    def _apply_mode_switch(self, confirmed: bool, new_mode: str) -> None:
+        """Apply the scheduled mode switch to the manifest."""
+        if not confirmed:
+            return
+
+        run_dir = self.run_data.run_dir
+        manifest_path = run_dir / "MANIFEST.json"
+
+        try:
+            manifest = json.loads(manifest_path.read_text())
+            if "metadata" not in manifest:
+                manifest["metadata"] = {}
+            manifest["metadata"]["scheduled_mode_switch"] = new_mode
+
+            tmp_path = manifest_path.with_suffix(".tmp")
+            tmp_path.write_text(json.dumps(manifest, indent=2))
+            tmp_path.rename(manifest_path)
+            self.notify(f"Mode switch to {new_mode} scheduled", severity="information")
+        except Exception as e:
+            self.notify(f"Failed to schedule mode switch: {e}", severity="error")
+
+    def action_intermediate_results(self) -> None:
+        """Run post-processing and display intermediate results (P key)."""
+        self._run_postprocessing_async()
+
+    @work(thread=True, exclusive=True, group="postprocessing")
+    def _run_postprocessing_async(self) -> None:
+        """Run post-processing scripts in a worker thread."""
+        import subprocess
+        from datetime import datetime
+
+        run_dir = self.run_data.run_dir
+        config_path = run_dir / "config.yaml"
+
+        if not config_path.exists():
+            self.app.call_from_thread(
+                self.notify, "No config.yaml found in run directory", severity="warning"
+            )
+            return
+
+        try:
+            import yaml
+            config = yaml.safe_load(config_path.read_text())
+        except Exception as e:
+            self.app.call_from_thread(
+                self.notify, f"Failed to read config: {e}", severity="error"
+            )
+            return
+
+        post_processing = config.get("post_processing", [])
+        if not post_processing:
+            self.app.call_from_thread(
+                self.notify, "No post-processing steps configured", severity="warning"
+            )
+            return
+
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        outputs = []
+
+        for pp in post_processing:
+            script = pp.get("script", "")
+            if not script:
+                continue
+
+            script_path = run_dir / script
+            if not script_path.exists():
+                outputs.append(f"--- {script} ---\n(script not found)\n")
+                continue
+
+            try:
+                result = subprocess.run(
+                    ["python3", str(script_path)],
+                    cwd=str(run_dir),
+                    capture_output=True,
+                    text=True,
+                    timeout=60,
+                )
+                output = result.stdout or ""
+                if result.stderr:
+                    output += f"\n[stderr]\n{result.stderr}"
+                outputs.append(f"--- {script} ---\n{output}")
+
+                # Save timestamped output
+                out_file = pp.get("output_file", "")
+                if out_file:
+                    stem = Path(out_file).stem
+                    suffix = Path(out_file).suffix
+                    timestamped = f"{stem}_{timestamp}{suffix}"
+                    ts_path = run_dir / timestamped
+                    ts_path.write_text(output)
+            except subprocess.TimeoutExpired:
+                outputs.append(f"--- {script} ---\n(timed out after 60s)\n")
+            except Exception as e:
+                outputs.append(f"--- {script} ---\n(error: {e})\n")
+
+        content = f"Intermediate Results ({timestamp})\n{'=' * 40}\n\n" + "\n\n".join(outputs)
+
+        def show_modal():
+            from ..modals import DetailModal
+            self.app.push_screen(DetailModal(
+                title=f"Intermediate Results ({timestamp})",
+                content=content,
+                content_type="text",
+            ))
+
+        self.app.call_from_thread(show_modal)
+
+    def action_troubleshoot(self) -> None:
+        """AI-assisted troubleshooting for failed runs (T key)."""
+        import sys
+        sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
+        from run_tools import generate_report
+        from ..modals import DetailModal
+
+        run_dir = self.run_data.run_dir
+
+        # Check for failures
+        try:
+            result = generate_report(run_dir)
+            if result.get("error"):
+                self.notify("Cannot analyze run", severity="error")
+                return
+        except Exception as e:
+            self.notify(f"Failed to analyze run: {e}", severity="error")
+            return
+
+        report_text = result.get("text", "")
+
+        # Check if there are actually failures
+        manifest_path = run_dir / "MANIFEST.json"
+        try:
+            manifest = json.loads(manifest_path.read_text())
+        except Exception:
+            manifest = {}
+
+        config_path = run_dir / "config.yaml"
+        config_text = ""
+        if config_path.exists():
+            try:
+                config_text = config_path.read_text()
+            except Exception:
+                pass
+
+        # Build troubleshooting prompt
+        pipeline_name = manifest.get("pipeline_name", "Unknown")
+        provider = manifest.get("metadata", {}).get("provider", "unknown")
+        model = manifest.get("metadata", {}).get("model", "unknown")
+
+        # Gather sample failures
+        sample_failures = []
+        for step_name in manifest.get("pipeline", []):
+            fail_path = run_dir / f"{step_name}_failures.jsonl"
+            if not fail_path.exists():
+                gz_path = Path(str(fail_path) + ".gz")
+                if gz_path.exists():
+                    fail_path = gz_path
+                else:
+                    continue
+            try:
+                import gzip
+                opener = gzip.open if fail_path.suffix == ".gz" else open
+                with opener(fail_path, "rt", encoding="utf-8") as f:
+                    for line in f:
+                        if len(sample_failures) >= 3:
+                            break
+                        try:
+                            sample_failures.append(json.loads(line.strip()))
+                        except json.JSONDecodeError:
+                            pass
+            except Exception:
+                pass
+            if len(sample_failures) >= 3:
+                break
+
+        samples_text = ""
+        if sample_failures:
+            samples_text = "\n\nSample Failed Units:\n"
+            for i, sf in enumerate(sample_failures, 1):
+                samples_text += f"\n--- Sample {i} ---\n{json.dumps(sf, indent=2)}\n"
+
+        prompt = f"""You are an Octobatch expert. Diagnose why these units are failing and suggest fixes.
+
+Pipeline: {pipeline_name}
+Provider: {provider}
+Model: {model}
+
+Pipeline Report:
+{report_text}
+{samples_text}
+Config (relevant sections):
+{config_text[:3000]}
+"""
+
+        # Show the prompt in a preview modal
+        self.app.push_screen(DetailModal(
+            title="Troubleshooting Prompt (Copy and send to AI)",
+            content=prompt,
+            content_type="text",
+        ))

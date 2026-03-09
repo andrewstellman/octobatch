@@ -706,6 +706,7 @@ def _build_run_data_from_summary(
     return {
         "name": folder.name,
         "path": folder,
+        "display_name": summary.get("display_name"),
         "status": status,
         "progress": summary.get("progress", 0),
         "cost": cost,
@@ -756,9 +757,13 @@ def _build_run_data_from_manifest(
         if has_batch_ids:
             mode_display = "mixed"
 
+    # Get display_name from metadata if set
+    display_name = manifest.get("metadata", {}).get("display_name")
+
     return {
         "name": folder.name,
         "path": folder,
+        "display_name": display_name,
         "status": status,
         "progress": progress,
         "cost": cost,
