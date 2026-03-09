@@ -23,13 +23,15 @@ def test_main_screen_uses_expected_actions():
     assert by_key["t"] == "troubleshoot"
 
 
-def test_home_screen_named_run_binding_is_n():
+def test_home_screen_named_run_binding_is_w():
     from tui.screens.home_screen import HomeScreen
     keys = [b.key for b in HomeScreen.BINDINGS]
-    assert "n" in keys
-    assert "N" in keys
-    assert "b" not in keys
-    assert "B" not in keys
+    assert "w" in keys
+    assert "W" in keys
+    by_key = {b.key: b.action for b in HomeScreen.BINDINGS}
+    assert by_key["w"] == "name_run"
+    # n/N must remain mapped to new_run, not shadowed
+    assert by_key["n"] == "new_run"
 
 
 def test_home_screen_compare_multiselect_bindings():
