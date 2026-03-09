@@ -1,7 +1,7 @@
 # Octobatch: Project Context & Architecture
 > **File:** `ai_context/PROJECT_CONTEXT.md`
 > **Scope:** This file documents stable architecture and design patterns.
-> **Version:** v1.0
+> **Version:** v1.1
 > For current work-in-progress, see `ai_context/DEVELOPMENT_CONTEXT.md`. For priorities, ask the user.
 
 **Octobatch** is a local, open-source batch orchestration tool designed to manage multi-phase LLM workflows. It supports three providers (Gemini, OpenAI, Anthropic) with both batch and realtime execution modes, providing robust management for rate limiting, crash recovery, chunking, validation, and pipeline orchestration.
@@ -57,9 +57,30 @@ The engine of the system. It runs as a subprocess and manages the lifecycle of a
 - `--realtime`: Run synchronously (can combine with `--init`)
 - `--max-units N`: Process only N units (for testing)
 - `--retry-failures`: Create retry batches for failed items
+- `--restart`: Stop a running orchestrator (SIGTERM → SIGKILL) and relaunch
+- `--name "Display Name"`: Set a display name for the run (stored in manifest metadata)
+- `--report` / `--report --json`: Generate pipeline validation funnel report from CLI
+- `--revalidate`: Re-run validation on existing failures without making API calls
 - `--provider`: Override provider (gemini/openai/anthropic)
 - `--model`: Override model identifier
 - `--quiet`: Suppress console output (log files still written)
+
+**Fan-Out Steps (`scope: fan_out`):**
+Fan-out steps expand array fields in parent units into individual child units, enabling one-to-many pipeline branching. Each child inherits all parent fields plus the individual array element.
+
+- Child unit IDs: `{parent_id}__fan{NNN}` (zero-padded 3-digit index)
+- Metadata fields: `_fan_parent_id`, `_fan_index` added to each child
+- Chunk packing: Children are packed into new `chunk_NNN` directories respecting `processing.chunk_size`
+- Parent chunk is marked `VALIDATED` (terminal) after fan-out
+- New chunks are registered in the manifest as `{next_step}_PENDING`
+- Validation funnel shows fan-out boundary as "N units created from M parents"
+- Expression step validation failures on fan-out steps are permanent (fast-fail)
+
+**Analysis Tooling (`run_tools.py`):**
+- `compare_runs(run_dirs)`: Cross-run comparison with pass rates, costs, strategy data. Saves markdown report.
+- `compare_hands(run1, run2, step, unit_id, sample)`: Hand-by-hand diff of validated outputs across two runs. Shows divergent fields, supports `--sample N` limiting.
+- `generate_report(run_dir, failures_by)`: Validation funnel report with optional failure grouping by any field. Shows fan-out boundaries.
+- `_resolve_run_dir(name)`: Resolves short names and prefixes against `runs/` directory.
 
 ### The TUI (`scripts/tui/`)
 
@@ -73,11 +94,17 @@ A Terminal User Interface built with the **Textual** framework. Provides visuali
    - Recent Runs: DataTable with completion status
    - Visual states: Active (green spinner), Detached (yellow ⚠), Failed (red ✗), Complete (green ✓), Complete ⚠ (yellow — has validation failures), Paused (⏸)
    - Failed column color: yellow for complete runs (validation failures), red for failed runs (hard failures)
+   - Multi-select: Space to toggle run selection, C to compare selected runs
+   - Named runs: W key to set display name (stored in `manifest.metadata.display_name`)
 
 2. **Run Detail (Main Screen)**
    - Pipeline visualization: Horizontal boxes showing step flow
    - Chunk/unit drill-down: See individual items and their status
    - Stats panel: Cost, tokens, duration, mode, validation failures (yellow), hard failures (red)
+   - G key: Pipeline validation funnel report modal
+   - M key: Schedule mode switch (batch ↔ realtime) — orchestrator drains outstanding batches before switching
+   - P key: View intermediate results for the selected step
+   - T key: AI troubleshooting — renders `scripts/templates/troubleshoot.jinja2` with failure context, sends to cheapest available provider via realtime API
 
 3. **Pipeline Editor**
    - Split-panel layout (top: visualization, bottom: details)
@@ -257,6 +284,7 @@ project-root/
 │       ├── screens/        # Screen classes
 │       │   ├── home_screen.py
 │       │   ├── main_screen.py
+│       │   ├── modals.py          # ConfirmModal, TextInputModal, TroubleshootModal
 │       │   ├── new_run_modal.py
 │       │   └── splash_screen.py
 │       ├── widgets/        # Reusable widget components

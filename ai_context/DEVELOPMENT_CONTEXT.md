@@ -1,8 +1,16 @@
 # Octobatch Development Context
 > **File:** `ai_context/DEVELOPMENT_CONTEXT.md`
-> **Status:** v1.0
+> **Status:** v1.1
 > **Scope:** This file tracks technical state and learnings.
 > Backlog priorities are communicated directly in chat prompts by the user.
+
+## v1.1 Key Features (new in v1.1)
+- **Fan-out steps** (`scope: fan_out`): Expand array fields into child units for one-to-many pipeline branching. Child IDs follow `{parent_id}__fan{NNN}` format. New chunks created respecting `processing.chunk_size`, registered as `{next_step}_PENDING`.
+- **Analysis tooling** (`run_tools.py`): Cross-run comparison (`compare_runs`), hand-by-hand diff (`compare_hands`), failures-by-field reporting (`--failures-by`), run directory prefix resolution.
+- **CLI enhancements**: `--restart` (stop and relaunch a run), `--name` (display name for runs), `--report` / `--report --json` (pipeline report from CLI), `--revalidate` (re-run validation on existing failures without API calls).
+- **TUI enhancements**: Pipeline report modal (G key), mode switch scheduling (M key), intermediate results viewer (P key), AI troubleshooting with provider selection (T key), cross-run comparison with multi-select (Space + C keys), named runs (W key).
+- **Stochastic testing**: AI-driven integration test runner (`tests/stochastic_runner.py`) that parses `ai_context/QUALITY.md` fitness scenarios and runs registered tests N times.
+- **Expression step optimization**: Expression steps bypass `max_inflight_batches` throttle in batch mode (no API call needed).
 
 ## v1.0 Key Features
 - **Multi-provider support**: Gemini, OpenAI, Anthropic (all with batch API support)
@@ -18,6 +26,8 @@
 - **Provider/model are optional in configs**: Can be specified at runtime via CLI flags (`--provider`, `--model`) or TUI selection
 - **Resolution precedence**: CLI flags > Step config > Global config > registry default_model
 - **Per-step provider/model**: Steps can specify `provider` and/or `model` in config.yaml; `get_step_provider()` resolves with CLI override tracking via manifest metadata
+- **Fan-out step lifecycle**: Parent chunk reads array field → creates child units → packs into new chunks respecting `chunk_size` → parent chunk marked `VALIDATED` (terminal) → child chunks registered as `{next_step}_PENDING`. Report shows fan-out boundary as "N units created from M parents".
+- **Scheduled mode switch**: TUI writes `manifest.metadata.scheduled_mode_switch` → orchestrator reads it in both `watch_run()` and `realtime_run()` → drains outstanding batches via `_drain_outstanding_batches()` → clears flag → calls the other mode's entry point.
 
 <!--
 PURPOSE: This file enables continuity between Claude Code sessions.
@@ -55,20 +65,22 @@ When you receive the bootstrap prompt:
 ---
 
 ## Last Updated
-**Feb 24, 2026** - v1.0 release finalized, code review cycle, dead code cleanup, tests reorganized
+**Mar 9, 2026** - v1.1 feature implementation complete, documentation updated
 
 ## Current Focus
-- v1.1 planning
+- v1.1 stabilization and testing
 
 ## Recently Completed
+- **Mar 9**: v1.1 WP4 — Fan-out steps (`scope: fan_out`), `--revalidate` flag (already implemented), stochastic integration testing runner
+- **Mar 9**: v1.1 WP3 — TUI enhancements: pipeline report modal (G), mode switch (M), intermediate results (P), AI troubleshooting (T), cross-run comparison (Space+C), named runs (W)
+- **Mar 9**: v1.1 WP2 — Analysis tooling: `compare_runs()`, `compare_hands()`, `--failures-by` in `generate_report()`, `_resolve_run_dir()` prefix matching
+- **Mar 9**: v1.1 WP1 — CLI enhancements: `--restart`, `--name`, `--report`/`--report --json`, expression step batch optimization
+- **Mar 9**: Test file reorganization — renamed test_wp*.py to meaningful names (test_cli_flags.py, test_analysis.py, test_tui_features.py, test_fan_out.py, test_stochastic_runner.py). Audited for coverage theater; 7 tests removed as metric-padding. Run `pytest tests/` to verify current count.
 - **Feb 24**: Dead code cleanup — removed 4 orphaned files: `scripts/tui/widgets.py` (shadowed by `widgets/` package), `scripts/tui/styles.py` (unused CSS constants, never imported), `scripts/find_and_mark_missing.py` (superseded by `--verify`/`--repair`), `scripts/generate_report.py` (unconfigured run-scope step). Cleaned up references in CONTEXT.md files and orchestrate.py comment.
 - **Feb 24**: Code review cycle — 19 fixes + 3 corrections from verification probe across orchestrator, TUI, and provider code
 - **Feb 24**: Archive/unarchive TUI feature — `X` key archives runs (moves to `runs/_archive/`), `H` key toggles show/hide archived runs on home screen. `ArchiveConfirmModal` in `screens/modals.py`. `scan_runs()` accepts `include_archived` parameter. Terminal-only safety check (cannot archive running runs).
-- **Feb 24**: Validate-config expression evaluation fix — chained namespaces and item field mocks for expression evaluation in config validation
-- **Feb 24**: NPCDialog scoring prompt fix — mood responsiveness clarification, threshold 0.4
 - **Feb 24**: Integration tests — 10/10 runs pass, 70/70 checks pass across all 3 providers (Gemini, OpenAI, Anthropic)
 - **Feb 24**: Documentation finalized — README, TOOLKIT, walkthroughs, contributing, tests/README
-- **Feb 24**: tests/ reorganized — `RUN_CODE_REVIEW.md` and `RUN_REGRESSION_TESTS.md` moved from `specs/`; code reviews in `tests/code_reviews/`
 - **Feb 24**: Copy script created for release repo
 
 ## v1.0 Release (Feb 2-21)

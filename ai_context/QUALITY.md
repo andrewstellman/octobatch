@@ -43,6 +43,17 @@ Before marking any task complete, every AI session must:
 5. If modifying provider code: add a test that verifies timeout/error handling
 6. Update this file if new coverage gaps are discovered
 
+### Coverage Theater Prevention
+
+AI-generated tests must be meaningful, not metric-padding. Tests that do any of the following are coverage theater and should not be written:
+- Assert properties of dict literals or data structures the test itself created
+- Assert that an import succeeded (X is not None after import)
+- Assert Python builtins work (string comparison, set operations, json round-trips)
+- Assert mock returns what the mock was configured to return
+- Call a function and only assert it didn't throw, without checking the return value
+
+Every test must verify actual application behavior. The test should fail if the corresponding code has a bug. If removing the function body wouldn't cause the test to fail, the test is theater.
+
 ### Why Every Gate Matters
 
 Do not argue coverage targets down. Do not skip testing a path that "looks simple." The drunken sailor bug looked simple — `random.seed(unit_index)` instead of `random.seed(hash(unit_id))` — but it created correlated sequences across all units. Only a statistical test caught it. Simple-looking code with hidden complexity is the most dangerous kind.

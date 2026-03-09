@@ -202,7 +202,7 @@ To make a step work, you must link it in **FOUR places** using the **exact same 
 - "No validation config for step"
 - "Failed to load schema"
 
-> **Exception:** Expression-only steps (`scope: expression`) are exempt from the 4-Point Link rule. They only need the `pipeline.steps` entry with their `expressions:` block. They do NOT require entries in `prompts.templates`, `schemas.files`, or `validation:`. However, expression steps **can** optionally include a `validation:` entry to enforce rules on their computed output — see [Failing Expression Steps with Validation Rules](#failing-expression-steps-with-validation-rules).
+> **Exception:** Expression-only steps (`scope: expression`) and fan-out steps (`scope: fan_out`) are exempt from the 4-Point Link rule. Expression steps only need the `pipeline.steps` entry with their `expressions:` block. Fan-out steps only need `pipeline.steps` with `field` and `child_field` parameters. Neither requires entries in `prompts.templates`, `schemas.files`, or `validation:`. However, expression steps **can** optionally include a `validation:` entry to enforce rules on their computed output — see [Failing Expression Steps with Validation Rules](#failing-expression-steps-with-validation-rules).
 
 > **Tip:** The `description` field in `pipeline.steps` is displayed in the TUI's Selected Step sidebar panel. Write clear, concise 1-2 sentence descriptions for each step so pipeline users can understand what each step does at a glance.
 
@@ -1138,6 +1138,73 @@ If a unit reaches `max_iterations` without satisfying the `loop_until` condition
 
 If your simulation requires long loops, increase `max_iterations` in the step config.
 
+### Fan-Out Steps
+
+Fan-out steps (`scope: fan_out`) expand an array field in each parent unit into individual child units. This enables one-to-many pipeline branching — for example, generating a list of items in one step and then evaluating each item individually in the next step.
+
+```yaml
+pipeline:
+  steps:
+    - name: generate
+      prompt_template: generate.jinja2
+      description: "Generate a list of ideas"
+
+    - name: expand
+      scope: fan_out
+      field: ideas          # Array field in parent unit to expand
+      child_field: idea     # Field name for each element in child units
+      description: "Expand each idea into its own unit"
+
+    - name: evaluate
+      prompt_template: evaluate.jinja2
+      description: "Evaluate each idea individually"
+```
+
+**How it works:**
+
+1. The fan-out step reads validated output from the previous step
+2. For each parent unit, it iterates over the array in `field` (e.g., `ideas`)
+3. Each array element becomes a new child unit with:
+   - **unit_id**: `{parent_id}__fan{NNN}` (zero-padded 3-digit index)
+   - **All parent fields** inherited (except the array field itself)
+   - **`child_field`**: Set to the individual array element (e.g., `idea: "Build a robot"`)
+   - **`_fan_parent_id`**: The parent's `unit_id` (for traceability)
+   - **`_fan_index`**: The element's position in the original array
+4. Children are packed into new `chunk_NNN` directories respecting `processing.chunk_size`
+5. Parent chunk is marked `VALIDATED` (terminal) — it does not proceed to further steps
+6. New child chunks are registered in the manifest as `{next_step}_PENDING`
+
+**Key characteristics:**
+- No `prompt_template`, `schema`, or `validation` entry required (exempt from 4-Point Link Rule, like expression steps)
+- No API costs (local data transformation)
+- Empty arrays produce zero children (parent is still marked terminal)
+- The pipeline report shows fan-out boundaries as "N units created from M parents" instead of standard pass rates
+- `verify_run()` handles fan-out boundaries by collecting child IDs as the new expected set
+
+**Example — Monte Carlo with fan-out:**
+
+```yaml
+pipeline:
+  steps:
+    - name: setup
+      scope: expression
+      description: "Generate random scenarios"
+      expressions:
+        variants: "[random.randint(1,100) for _ in range(5)]"
+
+    - name: expand_variants
+      scope: fan_out
+      field: variants
+      child_field: variant
+      description: "One unit per variant"
+
+    - name: evaluate
+      prompt_template: evaluate.jinja2
+      description: "LLM evaluates each variant"
+```
+
+This creates 5 child units per parent, each with a different `variant` value, then sends each to the LLM for evaluation.
+
 ---
 
 ## 8. Common Patterns
@@ -1799,6 +1866,10 @@ python scripts/orchestrate.py --init --pipeline X --run-dir runs/test --max-unit
 python scripts/orchestrate.py --init --pipeline X --run-dir runs/test \
   --provider openai --model gpt-4o-mini --yes
 
+# Initialize with a display name
+python scripts/orchestrate.py --init --pipeline X --run-dir runs/test \
+  --name "Experiment v2" --yes
+
 # Run realtime
 python scripts/orchestrate.py --realtime --run-dir runs/test
 
@@ -1807,6 +1878,19 @@ python scripts/orchestrate.py --watch --run-dir runs/test
 
 # Check status
 python scripts/orchestrate.py --status --run-dir runs/test
+
+# Generate pipeline report (text or JSON)
+python scripts/orchestrate.py --report --run-dir runs/test
+python scripts/orchestrate.py --report --json --run-dir runs/test
+
+# Re-validate failures without API calls
+python scripts/orchestrate.py --revalidate --run-dir runs/test
+
+# Restart a running orchestrator (stop + relaunch)
+python scripts/orchestrate.py --restart --run-dir runs/test
+
+# Name/rename a run
+python scripts/orchestrate.py --name "New Display Name" --run-dir runs/test
 ```
 
 ### TUI
@@ -1825,6 +1909,12 @@ The TUI (`python scripts/tui.py`) provides a visual interface for:
 - Provider-aware patience toast when batch mode idle >60 seconds
 - **Splash screen**: Animated Otto overlay on startup with key passthrough to underlying screen
 - **Retry logic**: R key retries only validation failures; hard failures skipped; failures archived to `.bak`
+- **Pipeline report modal (G key)**: Validation funnel report with fan-out boundary display
+- **Mode switch (M key)**: Schedule batch↔realtime mode switch; orchestrator drains outstanding batches before switching
+- **Intermediate results (P key)**: View validated output for the selected step
+- **AI troubleshooting (T key)**: Renders failure context into a Jinja2 template, selects cheapest available provider, sends via realtime API, displays response in modal
+- **Cross-run comparison (Space + C keys)**: Multi-select runs on home screen, compare pass rates and costs
+- **Named runs (W key)**: Set display names stored in `manifest.metadata.display_name`
 
 The TUI reads available providers and models from `scripts/providers/models.yaml`.
 
