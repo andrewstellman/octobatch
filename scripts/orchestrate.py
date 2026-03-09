@@ -3020,7 +3020,8 @@ def init_run(
     provider_override: str | None = None,
     model_override: str | None = None,
     used_default_provider: bool = False,
-    repeat_override: int | None = None
+    repeat_override: int | None = None,
+    display_name: str | None = None,
 ) -> bool:
     """
     Initialize a new run directory.
@@ -3033,6 +3034,7 @@ def init_run(
         model_override: Optional model to override config
         used_default_provider: True if provider was resolved from registry default
         repeat_override: Optional repeat count to override config
+        display_name: Optional human-readable name for the run
 
     Returns:
         True if successful, False otherwise
@@ -3332,7 +3334,8 @@ def init_run(
             "initial_input_tokens": 0,
             "initial_output_tokens": 0,
             "retry_input_tokens": 0,
-            "retry_output_tokens": 0
+            "retry_output_tokens": 0,
+            **({"display_name": display_name} if display_name else {}),
         }
     }
 
@@ -6302,6 +6305,126 @@ def _handle_info(args):
             print(f"  {chunk_name}  {state}  {valid}/{items} valid")
 
 
+def _handle_restart(args):
+    """Handle --restart: kill running orchestrator and relaunch."""
+    import subprocess
+    import time as _time
+
+    run_dir = args.run_dir
+    pid_file = run_dir / "orchestrator.pid"
+
+    if not pid_file.exists():
+        print(f"Error: No PID file found in {run_dir}", file=sys.stderr)
+        sys.exit(1)
+
+    try:
+        pid = int(pid_file.read_text().strip())
+    except (ValueError, OSError) as e:
+        print(f"Error: Cannot read PID file: {e}", file=sys.stderr)
+        sys.exit(1)
+
+    # Check if process is alive
+    alive = False
+    try:
+        os.kill(pid, 0)
+        alive = True
+    except ProcessLookupError:
+        print(f"Process {pid} is not running (already dead).")
+    except PermissionError:
+        alive = True  # Process exists but we can't signal it
+
+    if alive:
+        print(f"Sending SIGTERM to PID {pid}...")
+        try:
+            os.kill(pid, signal.SIGTERM)
+        except ProcessLookupError:
+            print(f"Process {pid} exited before SIGTERM.")
+            alive = False
+
+    if alive:
+        # Wait up to 5 seconds for exit
+        for _ in range(50):
+            _time.sleep(0.1)
+            try:
+                os.kill(pid, 0)
+            except ProcessLookupError:
+                print(f"Process {pid} terminated.")
+                alive = False
+                break
+        else:
+            # Still alive after 5 seconds — escalate to SIGKILL
+            print(f"Process {pid} did not exit, sending SIGKILL...")
+            try:
+                os.kill(pid, signal.SIGKILL)
+                _time.sleep(0.5)
+            except ProcessLookupError:
+                pass
+            print(f"Process {pid} killed.")
+
+    # Determine relaunch mode from manifest
+    try:
+        manifest = load_manifest(run_dir)
+    except Exception as e:
+        print(f"Error: Cannot load manifest: {e}", file=sys.stderr)
+        sys.exit(1)
+
+    metadata = manifest.get("metadata", {})
+    provider = metadata.get("provider", "gemini")
+    model = metadata.get("model")
+    mode = metadata.get("mode", "batch")
+
+    # Build relaunch command
+    relaunch_args = [sys.executable, str(Path(__file__))]
+    if mode == "realtime":
+        relaunch_args.extend(["--realtime", "--run-dir", str(run_dir)])
+    else:
+        relaunch_args.extend(["--watch", "--run-dir", str(run_dir)])
+
+    if provider:
+        relaunch_args.extend(["--provider", provider])
+    if model:
+        relaunch_args.extend(["--model", model])
+
+    print(f"Relaunching: {' '.join(relaunch_args)}")
+    os.execv(sys.executable, relaunch_args)
+
+
+def _handle_report(args):
+    """Handle --report: generate detailed run report."""
+    from run_tools import generate_report
+
+    run_dir = args.run_dir
+    report = generate_report(run_dir)
+
+    if report.get("error"):
+        print(f"Error: {report['error']}", file=sys.stderr)
+        sys.exit(1)
+
+    if args.json:
+        print(json.dumps(report, indent=2, default=str))
+        return
+
+    print(report["text"])
+
+
+def _handle_name(args):
+    """Handle --name without --init: update display name on existing run."""
+    run_dir = args.run_dir
+    if not run_dir or not run_dir.exists():
+        print("Error: --run-dir is required and must exist when using --name alone", file=sys.stderr)
+        sys.exit(1)
+
+    try:
+        manifest = load_manifest(run_dir)
+    except Exception as e:
+        print(f"Error: Cannot load manifest: {e}", file=sys.stderr)
+        sys.exit(1)
+
+    manifest.setdefault("metadata", {})["display_name"] = args.name
+    save_manifest(run_dir, manifest)
+    print(f"Display name set to: {args.name}")
+
+
 def _handle_verify(args):
     """Handle --verify: check run integrity."""
     from run_tools import verify_run
@@ -6517,6 +6640,16 @@ def main():
         action="store_true",
         help="Create retry chunks for missing units found by --verify"
     )
+    mode_group.add_argument(
+        "--restart",
+        action="store_true",
+        help="Kill running orchestrator and relaunch with same arguments"
+    )
+    mode_group.add_argument(
+        "--report",
+        action="store_true",
+        help="Generate a detailed run report (validation funnel, failures, cost)"
+    )
 
     # Output format
     parser.add_argument(
@@ -6600,6 +6733,13 @@ def main():
         help="Suppress console output (log files still written)"
     )
 
+    # Named runs
+    parser.add_argument(
+        "--name",
+        type=str,
+        help="Human-readable display name for the run (used with --init or --run-dir)"
+    )
+
     # Re-validation options
     parser.add_argument(
         "--step",
@@ -6621,9 +6761,10 @@ def main():
     # Validate that at least one mode is selected
     has_mode = any([args.init, args.tick, args.status, args.watch,
                     args.retry_failures, args.validate_config, args.realtime,
-                    args.revalidate, args.ps, args.info, args.verify, args.repair])
+                    args.revalidate, args.ps, args.info, args.verify, args.repair,
+                    args.restart, args.report, args.name])
     if not has_mode:
-        parser.error("One of --init, --tick, --status, --watch, --retry-failures, --validate-config, --revalidate, --realtime, --ps, --info, --verify, or --repair is required")
+        parser.error("One of --init, --tick, --status, --watch, --retry-failures, --validate-config, --revalidate, --realtime, --ps, --info, --verify, --repair, --restart, --report, or --name is required")
 
     # Handle --ps (doesn't need --run-dir)
     if args.ps:
@@ -6662,6 +6803,26 @@ def main():
             parser.error(f"Run directory not found: {args.run_dir}")
         exit_code = _handle_repair(args)
         sys.exit(exit_code)
+
+    # Handle --restart
+    if args.restart:
+        if not args.run_dir.exists():
+            parser.error(f"Run directory not found: {args.run_dir}")
+        _handle_restart(args)
+        # _handle_restart calls os.execv which replaces the process, so we never reach here
+        sys.exit(0)
+
+    # Handle --report
+    if args.report:
+        if not args.run_dir.exists():
+            parser.error(f"Run directory not found: {args.run_dir}")
+        _handle_report(args)
+        sys.exit(0)
+
+    # Handle --name (standalone, without --init)
+    if args.name and not args.init:
+        _handle_name(args)
+        sys.exit(0)
 
     # Handle --revalidate
     if args.revalidate:
@@ -6740,6 +6901,7 @@ def main():
             model_override=cli_model,
             used_default_provider=False,
             repeat_override=args.repeat,
+            display_name=getattr(args, 'name', None),
         )
         if not success:
             sys.exit(1)

@@ -19,7 +19,7 @@ import pytest
 # Add scripts directory to path so run_tools module is importable
 sys.path.insert(0, str(Path(__file__).parent.parent / "scripts"))
 
-from run_tools import verify_run, repair_run, _verify_step
+from run_tools import verify_run, repair_run, _verify_step, generate_report
 
 
 # =============================================================================
@@ -1419,3 +1419,319 @@ class TestGzipSupport:
         created = result["chunks_created"][0]
         assert created["step"] == "step2"
         assert created["unit_count"] == 2
+
+
+# =============================================================================
+# generate_report() tests
+# =============================================================================
+
+class TestGenerateReport:
+    """Tests for generate_report()."""
+
+    def test_missing_manifest_returns_error(self, tmp_path):
+        """generate_report returns error when no manifest exists."""
+        run_dir = tmp_path / "missing_run"
+        run_dir.mkdir()
+        result = generate_report(run_dir)
+        assert "error" in result
+
+    def test_empty_pipeline_returns_error(self, tmp_path):
+        """generate_report returns error when pipeline is empty."""
+        run_dir = tmp_path / "empty_run"
+        run_dir.mkdir()
+        write_manifest(run_dir, {"pipeline": [], "chunks": {}, "metadata": {}})
+        result = generate_report(run_dir)
+        assert "error" in result
+
+    def test_basic_report_from_perfect_run(self, tmp_path):
+        """generate_report produces correct funnel for a perfect single-step run."""
+        run_dir = tmp_path / "perfect_run"
+        run_dir.mkdir()
+        build_perfect_single_step_run(run_dir, num_units=5)
+        # Add metadata for cost calculation
+        manifest = json.loads((run_dir / "MANIFEST.json").read_text())
+        manifest["metadata"]["provider"] = "gemini"
+        manifest["metadata"]["model"] = "gemini-2.0-flash-001"
+        manifest["metadata"]["mode"] = "batch"
+        manifest["metadata"]["initial_input_tokens"] = 1000
+        manifest["metadata"]["initial_output_tokens"] = 500
+        manifest["status"] = "complete"
+        with open(run_dir / "MANIFEST.json", "w") as f:
+            json.dump(manifest, f)
+
+        result = generate_report(run_dir)
+        assert "error" not in result
+        assert "text" in result
+        assert result["total_units"] == 5
+        assert result["surviving_units"] == 5
+        assert result["yield_pct"] == 100.0
+
+        # Check funnel data
+        assert len(result["funnel"]) == 1
+        assert result["funnel"][0]["valid"] == 5
+        assert result["funnel"][0]["failed"] == 0
+        assert result["funnel"][0]["pass_pct"] == 100.0
+
+        # Check text contains key sections
+        text = result["text"]
+        assert "VALIDATION FUNNEL" in text
+        assert "TOKEN SUMMARY" in text
+        assert "step1" in text
+
+    def test_report_with_failures(self, tmp_path):
+        """generate_report correctly reports failures in funnel."""
+        run_dir = tmp_path / "fail_run"
+        run_dir.mkdir()
+
+        all_ids = [f"item_a__rep{i:04d}" for i in range(10)]
+        units = [make_unit(uid) for uid in all_ids]
+        valid_ids = all_ids[:8]
+        failed_ids = all_ids[8:]
+
+        manifest = {
+            "pipeline": ["step1"],
+            "chunks": {
+                "chunk_000": {
+                    "state": "VALIDATED",
+                    "items": 10,
+                    "valid": 8,
+                    "failed": 2,
+                    "retries": 0,
+                    "input_tokens": 0,
+                    "output_tokens": 0,
+                }
+            },
+            "metadata": {
+                "pipeline_name": "test",
+                "provider": "gemini",
+                "model": "gemini-2.0-flash-001",
+                "initial_input_tokens": 500,
+                "initial_output_tokens": 200,
+                "retry_input_tokens": 0,
+                "retry_output_tokens": 0,
+            },
+            "status": "complete",
+        }
+        write_manifest(run_dir, manifest)
+        chunk_dir = run_dir / "chunks" / "chunk_000"
+        write_jsonl(chunk_dir / "units.jsonl", units)
+        write_jsonl(chunk_dir / "step1_validated.jsonl",
+                    [make_unit(uid) for uid in valid_ids])
+        write_jsonl(chunk_dir / "step1_failures.jsonl",
+                    [make_unit(uid, error="bad output") for uid in failed_ids])
+
+        result = generate_report(run_dir)
+        assert result["surviving_units"] == 8
+        assert result["total_units"] == 10
+        assert result["yield_pct"] == 80.0
+        assert result["funnel"][0]["failed"] == 2
+
+        # Check failures by item section
+        text = result["text"]
+        assert "FAILURES BY ITEM" in text
+        assert "item_a" in text
+
+    def test_report_with_multi_step_failures(self, tmp_path):
+        """generate_report correctly chains multi-step funnel."""
+        run_dir = tmp_path / "multi_run"
+        run_dir.mkdir()
+        build_multi_step_run(
+            run_dir,
+            num_units=5,
+            step1_valid_ids=["unit_000", "unit_001", "unit_002", "unit_003"],
+            step1_failed_ids=["unit_004"],
+            step2_valid_ids=["unit_000", "unit_001", "unit_002"],
+            step2_failed_ids=["unit_003"],
+        )
+        # Add metadata
+        manifest = json.loads((run_dir / "MANIFEST.json").read_text())
+        manifest["metadata"]["provider"] = "openai"
+        manifest["metadata"]["model"] = "gpt-4o-mini"
+        manifest["metadata"]["initial_input_tokens"] = 2000
+        manifest["metadata"]["initial_output_tokens"] = 1000
+        manifest["metadata"]["retry_input_tokens"] = 0
+        manifest["metadata"]["retry_output_tokens"] = 0
+        manifest["status"] = "complete"
+        with open(run_dir / "MANIFEST.json", "w") as f:
+            json.dump(manifest, f)
+
+        result = generate_report(run_dir)
+        assert result["surviving_units"] == 3
+        assert len(result["funnel"]) == 2
+        assert result["funnel"][0]["valid"] == 4  # step1: 4/5
+        assert result["funnel"][1]["valid"] == 3  # step2: 3/4
+
+    def test_report_handles_gzipped_files(self, tmp_path):
+        """generate_report handles .jsonl.gz files transparently."""
+        import gzip
+        run_dir = tmp_path / "gz_run"
+        run_dir.mkdir()
+
+        units = [make_unit(f"u{i}") for i in range(3)]
+        manifest = {
+            "pipeline": ["step1"],
+            "chunks": {
+                "chunk_000": {
+                    "state": "VALIDATED",
+                    "items": 3,
+                    "valid": 3,
+                    "failed": 0,
+                    "retries": 0,
+                    "input_tokens": 0,
+                    "output_tokens": 0,
+                }
+            },
+            "metadata": {
+                "pipeline_name": "gz_test",
+                "provider": "gemini",
+                "model": "gemini-2.0-flash-001",
+                "initial_input_tokens": 100,
+                "initial_output_tokens": 50,
+                "retry_input_tokens": 0,
+                "retry_output_tokens": 0,
+            },
+            "status": "complete",
+        }
+        write_manifest(run_dir, manifest)
+        chunk_dir = run_dir / "chunks" / "chunk_000"
+        chunk_dir.mkdir(parents=True)
+        write_jsonl(chunk_dir / "units.jsonl", units)
+
+        # Write validated as .jsonl.gz
+        validated = [make_unit(f"u{i}", result="ok") for i in range(3)]
+        gz_path = chunk_dir / "step1_validated.jsonl.gz"
+        with gzip.open(gz_path, "wt") as f:
+            for record in validated:
+                f.write(json.dumps(record) + "\n")
+
+        result = generate_report(run_dir)
+        assert result["surviving_units"] == 3
+        assert result["funnel"][0]["valid"] == 3
+
+    def test_report_in_progress_run(self, tmp_path):
+        """generate_report handles runs with no end_time (in progress)."""
+        run_dir = tmp_path / "progress_run"
+        run_dir.mkdir()
+
+        units = [make_unit("u0")]
+        manifest = {
+            "pipeline": ["step1"],
+            "chunks": {
+                "chunk_000": {
+                    "state": "step1_PENDING",
+                    "items": 1,
+                    "valid": 0,
+                    "failed": 0,
+                    "retries": 0,
+                    "input_tokens": 0,
+                    "output_tokens": 0,
+                }
+            },
+            "metadata": {
+                "pipeline_name": "test",
+                "provider": "gemini",
+                "model": "gemini-2.0-flash-001",
+                "start_time": "2024-01-01T00:00:00Z",
+                "initial_input_tokens": 0,
+                "initial_output_tokens": 0,
+                "retry_input_tokens": 0,
+                "retry_output_tokens": 0,
+            },
+            "status": "running",
+        }
+        write_manifest(run_dir, manifest)
+        chunk_dir = run_dir / "chunks" / "chunk_000"
+        write_jsonl(chunk_dir / "units.jsonl", units)
+
+        result = generate_report(run_dir)
+        assert "error" not in result
+        assert "in progress" in result["text"]
+
+    def test_report_cost_uses_model_pricing(self, tmp_path):
+        """generate_report calculates cost using model registry pricing."""
+        run_dir = tmp_path / "cost_run"
+        run_dir.mkdir()
+        build_perfect_single_step_run(run_dir, num_units=1)
+        manifest = json.loads((run_dir / "MANIFEST.json").read_text())
+        manifest["metadata"]["provider"] = "gemini"
+        manifest["metadata"]["model"] = "gemini-2.0-flash-001"
+        manifest["metadata"]["mode"] = "realtime"
+        manifest["metadata"]["initial_input_tokens"] = 1_000_000
+        manifest["metadata"]["initial_output_tokens"] = 1_000_000
+        manifest["metadata"]["retry_input_tokens"] = 0
+        manifest["metadata"]["retry_output_tokens"] = 0
+        manifest["status"] = "complete"
+        with open(run_dir / "MANIFEST.json", "w") as f:
+            json.dump(manifest, f)
+
+        result = generate_report(run_dir)
+        # Gemini flash: $0.075/M in, $0.3/M out, realtime = no batch discount
+        # cost = (1M * 0.075 + 1M * 0.3) / 1M = 0.375
+        assert abs(result["cost"] - 0.375) < 0.01
+
+    def test_report_cost_batch_discount(self, tmp_path):
+        """generate_report applies 50% batch discount."""
+        run_dir = tmp_path / "batch_run"
+        run_dir.mkdir()
+        build_perfect_single_step_run(run_dir, num_units=1)
+        manifest = json.loads((run_dir / "MANIFEST.json").read_text())
+        manifest["metadata"]["provider"] = "gemini"
+        manifest["metadata"]["model"] = "gemini-2.0-flash-001"
+        manifest["metadata"]["mode"] = "batch"
+        manifest["metadata"]["initial_input_tokens"] = 1_000_000
+        manifest["metadata"]["initial_output_tokens"] = 1_000_000
+        manifest["metadata"]["retry_input_tokens"] = 0
+        manifest["metadata"]["retry_output_tokens"] = 0
+        manifest["status"] = "complete"
+        with open(run_dir / "MANIFEST.json", "w") as f:
+            json.dump(manifest, f)
+
+        result = generate_report(run_dir)
+        # Batch: (1M * 0.075 + 1M * 0.3) / 1M * 0.5 = 0.1875
+        assert abs(result["cost"] - 0.1875) < 0.01
+
+    def test_report_top_errors(self, tmp_path):
+        """generate_report extracts top errors from failure records."""
+        run_dir = tmp_path / "err_run"
+        run_dir.mkdir()
+
+        units = [make_unit(f"u{i}") for i in range(5)]
+        manifest = {
+            "pipeline": ["step1"],
+            "chunks": {
+                "chunk_000": {
+                    "state": "VALIDATED",
+                    "items": 5,
+                    "valid": 2,
+                    "failed": 3,
+                    "retries": 0,
+                    "input_tokens": 0,
+                    "output_tokens": 0,
+                }
+            },
+            "metadata": {
+                "pipeline_name": "test",
+                "provider": "gemini",
+                "model": "gemini-2.0-flash-001",
+                "initial_input_tokens": 0,
+                "initial_output_tokens": 0,
+                "retry_input_tokens": 0,
+                "retry_output_tokens": 0,
+            },
+            "status": "complete",
+        }
+        write_manifest(run_dir, manifest)
+        chunk_dir = run_dir / "chunks" / "chunk_000"
+        write_jsonl(chunk_dir / "units.jsonl", units)
+        write_jsonl(chunk_dir / "step1_validated.jsonl",
+                    [make_unit("u0"), make_unit("u1")])
+        write_jsonl(chunk_dir / "step1_failures.jsonl", [
+            make_unit("u2", error="Schema validation failed"),
+            make_unit("u3", error="Schema validation failed"),
+            make_unit("u4", error="Missing required field"),
+        ])
+
+        result = generate_report(run_dir)
+        text = result["text"]
+        assert "TOP ERRORS BY STEP" in text
+        assert "Schema validation failed" in text
