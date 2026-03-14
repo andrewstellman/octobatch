@@ -281,11 +281,9 @@ Pricing comes from the model registry. The TUI's `compute_cost()` helper and the
 
 ### Cross-Provider
 
-1. **No `.env` auto-loading** — Not implemented. API keys must be set as environment variables before running the orchestrator.
+1. **No provider health checks** — The system doesn't verify API key validity or provider availability before starting a run. A bad API key only surfaces when the first batch submission or realtime call fails.
 
-2. **No provider health checks** — The system doesn't verify API key validity or provider availability before starting a run. A bad API key only surfaces when the first batch submission or realtime call fails.
-
-3. **Token counting differences** — Each provider counts tokens differently. Cost estimates are approximations, especially for input tokens where providers may count system prompts and formatting differently.
+2. **Token counting differences** — Each provider counts tokens differently. Cost estimates are approximations, especially for input tokens where providers may count system prompts and formatting differently.
 
 ---
 

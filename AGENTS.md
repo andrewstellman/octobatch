@@ -12,7 +12,7 @@ source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
-API keys are set as environment variables: `GOOGLE_API_KEY` (Gemini), `OPENAI_API_KEY` (OpenAI), `ANTHROPIC_API_KEY` (Anthropic).
+API keys are set as environment variables: `GOOGLE_API_KEY` (Gemini), `OPENAI_API_KEY` (OpenAI), `ANTHROPIC_API_KEY` (Anthropic). Keys can be placed in a `.env` file in the project root (see `.env.example`); the orchestrator and TUI load it automatically via `python-dotenv`.
 
 ## Build & test
 
