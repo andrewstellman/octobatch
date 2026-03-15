@@ -1649,8 +1649,8 @@ def prepare_prompts(
                 continue
             try:
                 unit = json.loads(line)
-                # Get seed - use _repetition_seed if present, otherwise hash of unit_id + step_name
-                seed = unit.get("_repetition_seed", int(hashlib.sha256((unit.get("unit_id", "") + step).encode()).hexdigest(), 16) & 0x7FFFFFFF)
+                # Get seed - use _repetition_seed if present, otherwise hash of unit_id
+                seed = unit.get("_repetition_seed", int(hashlib.sha256(unit.get("unit_id", "").encode()).hexdigest(), 16) & 0x7FFFFFFF)
 
                 # Evaluate expressions with unit data as context
                 try:
@@ -4294,8 +4294,8 @@ def run_expression_step(
     for unit in units:
         unit_id = unit.get("unit_id", "unknown")
 
-        # Get seed - use _repetition_seed if present, otherwise hash of unit_id + step_name
-        seed = unit.get("_repetition_seed", int(hashlib.sha256((unit_id + step).encode()).hexdigest(), 16) & 0x7FFFFFFF)
+        # Get seed - use _repetition_seed if present, otherwise hash of unit_id
+        seed = unit.get("_repetition_seed", int(hashlib.sha256(unit_id.encode()).hexdigest(), 16) & 0x7FFFFFFF)
 
         try:
             output_unit = unit.copy()
