@@ -2627,7 +2627,7 @@ def tick_run(run_dir: Path, max_retries: int = 5, drain_submitted_only: bool = F
     _logged_batch_steps = set()  # Track which steps have had provider logged
     throttled_count = 0
 
-    for chunk_name, chunk_data in chunks.items():
+    for chunk_name, chunk_data in list(chunks.items()):
         step, status = parse_state(chunk_data["state"])
 
         if status == "PENDING":
