@@ -493,3 +493,105 @@ class TestSharedETA:
         # Both should be valid, not —
         assert eta1 != "—"
         assert eta2 != "—"
+
+
+# =============================================================================
+# get_run_status — status inference from manifest
+# =============================================================================
+
+class TestGetRunStatus:
+    """Tests for get_run_status() manifest status inference."""
+
+    def test_explicit_running_with_failed_chunks_returns_active(self):
+        """A running manifest with some failed chunks should return 'active',
+        not 'failed'. The orchestrator is still processing other chunks."""
+        from tui.utils.runs import get_run_status
+        manifest = {
+            "status": "running",
+            "chunks": {
+                "chunk_000": {"state": "VALIDATED"},
+                "chunk_001": {"state": "FAILED"},
+                "chunk_002": {"state": "score_PENDING"},
+            },
+        }
+        assert get_run_status(manifest) == "active"
+
+    def test_explicit_running_all_chunks_validated_returns_active(self):
+        """Even if all chunks are validated, explicit 'running' wins."""
+        from tui.utils.runs import get_run_status
+        manifest = {
+            "status": "running",
+            "chunks": {
+                "chunk_000": {"state": "VALIDATED"},
+                "chunk_001": {"state": "VALIDATED"},
+            },
+        }
+        assert get_run_status(manifest) == "active"
+
+    def test_explicit_failed_returns_failed(self):
+        """Manifest explicitly set to 'failed' returns 'failed'."""
+        from tui.utils.runs import get_run_status
+        manifest = {"status": "failed", "chunks": {}}
+        assert get_run_status(manifest) == "failed"
+
+    def test_explicit_complete_returns_complete(self):
+        """Manifest explicitly set to 'complete' returns 'complete'."""
+        from tui.utils.runs import get_run_status
+        manifest = {"status": "complete", "chunks": {}}
+        assert get_run_status(manifest) == "complete"
+
+    def test_explicit_paused_returns_paused(self):
+        """Manifest explicitly set to 'paused' returns 'paused'."""
+        from tui.utils.runs import get_run_status
+        manifest = {"status": "paused", "chunks": {}}
+        assert get_run_status(manifest) == "paused"
+
+    def test_no_status_failed_chunks_returns_failed(self):
+        """Without explicit status, failed chunks infer 'failed'."""
+        from tui.utils.runs import get_run_status
+        manifest = {
+            "chunks": {
+                "chunk_000": {"state": "VALIDATED"},
+                "chunk_001": {"state": "FAILED"},
+            },
+        }
+        assert get_run_status(manifest) == "failed"
+
+    def test_no_status_all_validated_returns_complete(self):
+        """Without explicit status, all validated infers 'complete'."""
+        from tui.utils.runs import get_run_status
+        manifest = {
+            "chunks": {
+                "chunk_000": {"state": "VALIDATED"},
+                "chunk_001": {"state": "VALIDATED"},
+            },
+        }
+        assert get_run_status(manifest) == "complete"
+
+    def test_no_status_all_pending_returns_pending(self):
+        """Without explicit status, all pending infers 'pending'."""
+        from tui.utils.runs import get_run_status
+        manifest = {
+            "chunks": {
+                "chunk_000": {"state": "PENDING"},
+                "chunk_001": {"state": "PENDING"},
+            },
+        }
+        assert get_run_status(manifest) == "pending"
+
+    def test_no_status_mixed_non_terminal_returns_detached(self):
+        """Without explicit status and mixed states, returns 'detached'."""
+        from tui.utils.runs import get_run_status
+        manifest = {
+            "chunks": {
+                "chunk_000": {"state": "VALIDATED"},
+                "chunk_001": {"state": "score_PENDING"},
+            },
+        }
+        assert get_run_status(manifest) == "detached"
+
+    def test_no_chunks_returns_pending(self):
+        """Empty chunks dict returns 'pending'."""
+        from tui.utils.runs import get_run_status
+        manifest = {"chunks": {}}
+        assert get_run_status(manifest) == "pending"

@@ -136,7 +136,14 @@ def get_run_status(manifest: Dict[str, Any]) -> str:
     if explicit_status in ("complete", "failed", "paused", "killed"):
         return explicit_status
 
-    # Infer status from chunk states
+    # If orchestrator explicitly says "running", trust it — don't infer
+    # from chunk states. Individual chunk failures don't mean the run failed
+    # when the orchestrator is still actively processing other chunks.
+    # get_enhanced_run_status() will verify the PID is actually alive.
+    if explicit_status == "running":
+        return "active"
+
+    # Infer status from chunk states (no explicit status set)
     chunks = manifest.get("chunks", {})
     if not chunks:
         return "pending"
@@ -153,14 +160,9 @@ def get_run_status(manifest: Dict[str, Any]) -> str:
     elif pending == total:
         return "pending"
     else:
-        # Run is not complete but not pending either
-        # If explicit status is "running", it's actively running
-        # Otherwise, it's detached (orchestrator may have died)
-        if explicit_status == "running":
-            return "active"
-        else:
-            # No explicit status and not terminal - likely detached
-            return "detached"
+        # No explicit status and not terminal - likely detached
+        # (explicit "running" is already handled above)
+        return "detached"
 
 
 def get_run_progress(manifest: Dict[str, Any]) -> int:

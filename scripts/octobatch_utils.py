@@ -92,7 +92,12 @@ def _build_summary(manifest: dict) -> dict:
     # Status: use explicit field or infer from chunks
     status = manifest.get("status", "pending")
     if status not in ("complete", "failed", "paused", "killed"):
-        if chunks:
+        # If orchestrator explicitly says "running", trust it — don't infer
+        # from chunk states. Individual chunk failures don't mean the run
+        # failed when the orchestrator is still processing other chunks.
+        if status == "running":
+            status = "active"
+        elif chunks:
             total = len(chunks)
             validated = sum(1 for c in chunks.values() if c.get("state") == "VALIDATED")
             failed = sum(1 for c in chunks.values() if c.get("state") == "FAILED")
@@ -100,8 +105,6 @@ def _build_summary(manifest: dict) -> dict:
                 status = "complete"
             elif failed > 0:
                 status = "failed"
-            elif status == "running":
-                status = "active"
 
     # Progress: step-level granularity
     progress = 0

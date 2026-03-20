@@ -252,6 +252,22 @@ class TestBuildSummary:
         summary = _build_summary(manifest)
         assert summary["status"] == "active"
 
+    def test_status_running_with_failed_chunks_returns_active(self):
+        """A running manifest with some failed chunks should return 'active',
+        not 'failed'. The orchestrator is still processing other chunks."""
+        manifest = {
+            "status": "running",
+            "chunks": {
+                "c0": {"state": "VALIDATED", "items": 50, "valid": 50, "failed": 0},
+                "c1": {"state": "FAILED", "items": 50, "valid": 49, "failed": 0},
+                "c2": {"state": "score_PENDING", "items": 50, "valid": 50, "failed": 0},
+            },
+            "metadata": {},
+            "pipeline": ["generate", "refine", "score"],
+        }
+        summary = _build_summary(manifest)
+        assert summary["status"] == "active"
+
     def test_status_explicit_paused(self):
         manifest = {
             "status": "paused",
