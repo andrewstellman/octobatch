@@ -1435,6 +1435,7 @@ def resume_orchestrator(run_dir: Path, mode: str = "watch") -> bool:
         str(project_root / "scripts" / "orchestrate.py"),
         "--run-dir", str(run_dir),
         f"--{mode}",
+        "--yes",
     ]
 
     # Touch manifest timestamp so TUI sees fresh activity
