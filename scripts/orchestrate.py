@@ -5351,10 +5351,10 @@ def realtime_run(
             response = input().strip().lower()
             if response not in ('y', 'yes'):
                 print("Aborted.")
-                return 0
+                return 1
         except (EOFError, KeyboardInterrupt):
             print("\nAborted.")
-            return 0
+            return 1
 
     # Initialize metadata if needed
     if "metadata" not in manifest:
@@ -6693,7 +6693,7 @@ def _handle_restart(args):
     # Build relaunch command
     relaunch_args = [sys.executable, str(Path(__file__))]
     if mode == "realtime":
-        relaunch_args.extend(["--realtime", "--run-dir", str(run_dir)])
+        relaunch_args.extend(["--realtime", "--run-dir", str(run_dir), "--yes"])
     else:
         relaunch_args.extend(["--watch", "--run-dir", str(run_dir)])
 

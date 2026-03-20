@@ -95,6 +95,7 @@ class TestRestart:
                 _handle_restart(args)
                 call_args = mock_execv.call_args[0][1]
                 assert "--realtime" in call_args
+                assert "--yes" in call_args
 
     def test_restart_relaunches_batch(self, tmp_path):
         from orchestrate import _handle_restart
@@ -141,6 +142,70 @@ class TestRestart:
 
         sent = [sig for _, sig in kill_calls if sig in (signal.SIGTERM, signal.SIGKILL)]
         assert signal.SIGTERM in sent
+
+
+class TestRealtimeConfirmationAbort:
+    def test_realtime_run_returns_1_when_user_declines_large_run(self, tmp_path):
+        from orchestrate import realtime_run
+
+        run_dir = tmp_path / "test_run"
+        manifest = {
+            "config": "config/config.yaml",
+            "pipeline": ["step1"],
+            "chunks": {
+                "chunk_000": {
+                    "state": "step1_PENDING",
+                    "items": 51,
+                    "valid": 0,
+                    "failed": 0,
+                    "retries": 0,
+                }
+            },
+            "metadata": {"mode": "realtime"},
+            "status": "running",
+        }
+        write_manifest(run_dir, manifest)
+        config_dir = run_dir / "config"
+        config_dir.mkdir(parents=True, exist_ok=True)
+        (config_dir / "config.yaml").write_text("pipeline:\n  steps:\n    - name: step1\n")
+
+        with patch("orchestrate.check_prerequisites", return_value=None):
+            with patch("orchestrate.retry_validation_failures", return_value=0):
+                with patch("builtins.input", return_value="n"):
+                    exit_code = realtime_run(run_dir)
+
+        assert exit_code == 1
+
+    def test_realtime_run_returns_1_on_eof_during_large_run_confirmation(self, tmp_path):
+        from orchestrate import realtime_run
+
+        run_dir = tmp_path / "test_run"
+        manifest = {
+            "config": "config/config.yaml",
+            "pipeline": ["step1"],
+            "chunks": {
+                "chunk_000": {
+                    "state": "step1_PENDING",
+                    "items": 51,
+                    "valid": 0,
+                    "failed": 0,
+                    "retries": 0,
+                }
+            },
+            "metadata": {"mode": "realtime"},
+            "status": "running",
+        }
+        write_manifest(run_dir, manifest)
+        config_dir = run_dir / "config"
+        config_dir.mkdir(parents=True, exist_ok=True)
+        (config_dir / "config.yaml").write_text("pipeline:\n  steps:\n    - name: step1\n")
+
+        with patch("orchestrate.check_prerequisites", return_value=None):
+            with patch("orchestrate.retry_validation_failures", return_value=0):
+                with patch("builtins.input", side_effect=EOFError):
+                    exit_code = realtime_run(run_dir)
+
+        assert exit_code == 1
 
 
 class TestExpressionThrottleOrdering:
