@@ -1414,6 +1414,114 @@ class TestGetNextRetryNumber:
         (chunks_dir / "somefile.txt").touch()
         assert get_next_retry_number(chunks_dir) == 3
 
+    def test_manifest_chunks_higher_than_disk(self, tmp_path):
+        """Uses manifest retry number when it exceeds on-disk directories.
+
+        After a crash, stale directories may have been cleaned up but the
+        manifest still references the old retry chunk keys.
+        """
+        chunks_dir = tmp_path / "chunks"
+        chunks_dir.mkdir()
+        (chunks_dir / "retry_001").mkdir()
+        # Manifest knows about retry_005 even though directory was cleaned up
+        manifest_chunks = {"chunk_000": {}, "retry_005": {}, "retry_001": {}}
+        assert get_next_retry_number(chunks_dir, manifest_chunks=manifest_chunks) == 6
+
+    def test_disk_higher_than_manifest(self, tmp_path):
+        """Uses disk retry number when it exceeds manifest keys.
+
+        After a crash, the directory may exist on disk but the manifest
+        entry was never written (crash between mkdir and manifest save).
+        """
+        chunks_dir = tmp_path / "chunks"
+        chunks_dir.mkdir()
+        (chunks_dir / "retry_010").mkdir()
+        manifest_chunks = {"chunk_000": {}, "retry_003": {}}
+        assert get_next_retry_number(chunks_dir, manifest_chunks=manifest_chunks) == 11
+
+    def test_manifest_chunks_none_falls_back_to_disk_only(self, tmp_path):
+        """When manifest_chunks is None, behaves like the original function."""
+        chunks_dir = tmp_path / "chunks"
+        chunks_dir.mkdir()
+        (chunks_dir / "retry_002").mkdir()
+        assert get_next_retry_number(chunks_dir, manifest_chunks=None) == 3
+
+
+class TestRetryStaleDirectoryCleanup:
+    """Tests that retry chunk creation cleans stale directories from crashes."""
+
+    def test_stale_retry_dir_cleaned_on_collision(self, tmp_path):
+        """A stale retry directory with leftover artifacts is removed on collision.
+
+        Scenario: the orchestrator crashed between mkdir(retry_001) and
+        writing the manifest entry for retry_001.  On restart, the manifest
+        has no retry keys, so get_next_retry_number returns 1 (from disk
+        max=0, since the stale dir doesn't bump it past what will be
+        allocated — wait, it does: disk scan finds retry_001 → max=1 →
+        returns 2).
+
+        To force a true collision we need the allocated number to match
+        an existing stale dir.  This happens when get_next_retry_number
+        computes N but retry_N was created between the scan and mkdir
+        (a race), or if the scan itself is stale.  We simulate it by
+        patching get_next_retry_number to return 1, while retry_001
+        already exists with stale artifacts.
+        """
+        from unittest.mock import patch
+
+        run_dir = tmp_path
+        chunks_dir = run_dir / "chunks"
+        chunk_dir = chunks_dir / "chunk_000"
+        chunk_dir.mkdir(parents=True)
+        log_file = run_dir / "RUN_LOG.txt"
+        log_file.touch()
+
+        with open(chunk_dir / "units.jsonl", "w") as f:
+            f.write(json.dumps({"unit_id": "u1"}) + "\n")
+
+        with open(chunk_dir / "step_a_failures.jsonl", "w") as f:
+            f.write(json.dumps({
+                "unit_id": "u1", "failure_stage": "schema_validation",
+                "errors": [{"message": "bad field"}], "retry_count": 0
+            }) + "\n")
+
+        # Pre-create retry_001 with stale artifacts
+        stale_dir = chunks_dir / "retry_001"
+        stale_dir.mkdir()
+        (stale_dir / "step_a_validated.jsonl").write_text(
+            json.dumps({"unit_id": "old_stale_unit", "stale": True}) + "\n"
+        )
+        (stale_dir / "step_a_results.jsonl").write_text('{"stale": "result"}\n')
+
+        manifest = {
+            "status": "running",
+            "pipeline": ["step_a"],
+            "chunks": {
+                "chunk_000": {"state": "step_a_FAILED", "items": 1,
+                              "valid": 0, "failed": 1, "retries": 0},
+            },
+        }
+
+        # Force get_next_retry_number to return 1 so it collides with
+        # the stale retry_001 directory
+        with patch("orchestrate.get_next_retry_number", return_value=1):
+            archived = retry_validation_failures(run_dir, manifest, log_file)
+
+        assert archived == 1
+
+        retry_dir = chunks_dir / "retry_001"
+        assert retry_dir.exists()
+
+        # Fresh units.jsonl with our unit
+        with open(retry_dir / "units.jsonl") as f:
+            units = [json.loads(l) for l in f if l.strip()]
+        assert len(units) == 1
+        assert units[0]["unit_id"] == "u1"
+
+        # Stale artifacts must be gone
+        assert not (retry_dir / "step_a_validated.jsonl").exists()
+        assert not (retry_dir / "step_a_results.jsonl").exists()
+
 
 # =============================================================================
 # Parse Duration

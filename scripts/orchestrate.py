@@ -916,7 +916,7 @@ def retry_validation_failures(run_dir: Path, manifest: dict, log_file: Path, max
     chunks = manifest.get("chunks", {})
     chunks_dir = run_dir / "chunks"
     archived_total = 0
-    next_retry_num = get_next_retry_number(chunks_dir)
+    next_retry_num = get_next_retry_number(chunks_dir, manifest_chunks=chunks)
 
     # Load config to identify expression steps (deterministic — retrying won't help)
     config = None
@@ -1047,6 +1047,10 @@ def retry_validation_failures(run_dir: Path, manifest: dict, log_file: Path, max
             if units_for_retry:
                 retry_name = f"retry_{next_retry_num:03d}"
                 retry_dir = chunks_dir / retry_name
+                if retry_dir.exists():
+                    # Stale directory from a previous crash — remove it to
+                    # avoid contamination from leftover artifact files.
+                    shutil.rmtree(retry_dir)
                 retry_dir.mkdir(parents=True)
 
                 units_file = retry_dir / "units.jsonl"
@@ -3418,20 +3422,35 @@ def status_run(run_dir: Path) -> dict:
     )
 
 
-def get_next_retry_number(chunks_dir: Path) -> int:
+def get_next_retry_number(chunks_dir: Path, manifest_chunks: dict | None = None) -> int:
     """
     Find the next available retry chunk number.
 
-    Scans existing retry_NNN directories and returns the next number.
+    Scans both existing retry_NNN directories on disk AND manifest chunk
+    keys, returning one past the highest found in either source.  This
+    prevents collisions when stale directories survive a crash/restart
+    but have already been removed from the manifest, or vice-versa.
     """
     max_num = 0
-    for item in chunks_dir.iterdir():
-        if item.is_dir() and item.name.startswith("retry_"):
-            try:
-                num = int(item.name.split("_")[1])
-                max_num = max(max_num, num)
-            except (IndexError, ValueError):
-                pass
+    # Check on-disk directories
+    if chunks_dir.exists():
+        for item in chunks_dir.iterdir():
+            if item.is_dir() and item.name.startswith("retry_"):
+                try:
+                    num = int(item.name.split("_")[1])
+                    max_num = max(max_num, num)
+                except (IndexError, ValueError):
+                    pass
+    # Also check manifest keys (may reference chunks not yet on disk,
+    # or chunks whose directories were cleaned up)
+    if manifest_chunks:
+        for chunk_name in manifest_chunks:
+            if chunk_name.startswith("retry_"):
+                try:
+                    num = int(chunk_name.split("_")[1])
+                    max_num = max(max_num, num)
+                except (IndexError, ValueError):
+                    pass
     return max_num + 1
 
 
@@ -3668,7 +3687,7 @@ def retry_failures_run(run_dir: Path, max_retries: int = 5) -> dict:
 
     # Step 4: Create retry chunks
     retry_chunks_created = []
-    next_retry_num = get_next_retry_number(chunks_dir)
+    next_retry_num = get_next_retry_number(chunks_dir, manifest_chunks=chunks)
 
     for step, units in retryable_by_step.items():
         if not units:
@@ -3677,6 +3696,10 @@ def retry_failures_run(run_dir: Path, max_retries: int = 5) -> dict:
         # Create retry chunk directory
         retry_name = f"retry_{next_retry_num:03d}"
         retry_dir = chunks_dir / retry_name
+        if retry_dir.exists():
+            # Stale directory from a previous crash — remove it to
+            # avoid contamination from leftover artifact files.
+            shutil.rmtree(retry_dir)
         retry_dir.mkdir()
 
         # Write units.jsonl - extract unit data from the info dict
