@@ -208,6 +208,70 @@ class TestRealtimeConfirmationAbort:
         assert exit_code == 1
 
 
+class TestTerminalRecoveryEntryPoints:
+    def _create_terminal_recovery_run(self, tmp_path, mode: str) -> Path:
+        run_dir = tmp_path / f"{mode}_terminal_recovery"
+        manifest = {
+            "config": "config/config.yaml",
+            "pipeline": ["step1"],
+            "chunks": {
+                "chunk_000": {
+                    "state": "VALIDATED",
+                    "items": 50,
+                    "valid": 50,
+                    "failed": 0,
+                    "retries": 0,
+                },
+                "chunk_001": {
+                    "state": "FAILED",
+                    "items": 50,
+                    "valid": 50,
+                    "failed": 0,
+                    "retries": 0,
+                },
+            },
+            "metadata": {"mode": mode},
+            "status": "running",
+        }
+        write_manifest(run_dir, manifest)
+        config_dir = run_dir / "config"
+        config_dir.mkdir(parents=True, exist_ok=True)
+        (config_dir / "config.yaml").write_text("pipeline:\n  steps:\n    - name: step1\n")
+        (run_dir / "chunks" / "chunk_000").mkdir(parents=True, exist_ok=True)
+        (run_dir / "chunks" / "chunk_001").mkdir(parents=True, exist_ok=True)
+        return run_dir
+
+    def test_watch_run_marks_failed_chunk_terminal_when_no_failure_files_remain(self, tmp_path):
+        from orchestrate import watch_run
+
+        run_dir = self._create_terminal_recovery_run(tmp_path, mode="batch")
+
+        with patch("orchestrate.check_prerequisites", return_value=None):
+            with patch("orchestrate.retry_validation_failures", return_value=0):
+                exit_code = watch_run(run_dir, interval=1, max_retries=5)
+
+        manifest = json.loads((run_dir / "MANIFEST.json").read_text())
+        assert exit_code == 0
+        assert manifest["status"] == "complete"
+        assert manifest["chunks"]["chunk_001"]["retries"] == 5
+
+    def test_realtime_run_marks_failed_chunk_terminal_when_no_failure_files_remain(self, tmp_path):
+        from orchestrate import realtime_run
+
+        run_dir = self._create_terminal_recovery_run(tmp_path, mode="realtime")
+
+        with patch("orchestrate.check_prerequisites", return_value=None):
+            with patch("orchestrate.retry_validation_failures", return_value=0):
+                with patch("orchestrate.write_pid_file"):
+                    with patch("orchestrate.atexit.register"):
+                        exit_code = realtime_run(run_dir, max_retries=5, skip_confirmation=True)
+
+        manifest = json.loads((run_dir / "MANIFEST.json").read_text())
+        assert exit_code == 0
+        assert manifest["status"] == "complete"
+        assert manifest["chunks"]["chunk_001"]["retries"] == 5
+
+
 class TestExpressionThrottleOrdering:
     def test_expression_before_inflight_throttle(self):
         orchestrate_path = Path(__file__).parent.parent / "scripts" / "orchestrate.py"

@@ -5300,6 +5300,26 @@ class TestPostProcessingBarrier:
         }
         assert is_run_terminal(manifest, max_retries=5) is False
 
+    def test_failed_chunk_no_failure_files_is_not_terminal_without_patch(self, tmp_path):
+        """A FAILED chunk with retries=0 is NOT terminal per is_run_terminal alone.
+
+        This confirms the function's contract: is_run_terminal() only checks
+        retries vs max_retries. The entry-point patch (watch_run/realtime_run)
+        is responsible for bumping retries when no failure files remain.
+        """
+        manifest = {
+            "chunks": {
+                "chunk_000": {"state": "VALIDATED", "valid": 50, "failed": 0},
+                "chunk_001": {"state": "FAILED", "valid": 50, "failed": 0, "retries": 0},
+            }
+        }
+        # Without the entry-point patch, this chunk blocks terminal detection
+        assert is_run_terminal(manifest, max_retries=5) is False
+
+        # After the entry-point patch bumps retries to max_retries, it becomes terminal
+        manifest["chunks"]["chunk_001"]["retries"] = 5
+        assert is_run_terminal(manifest, max_retries=5) is True
+
 
 # =============================================================================
 # v1.0.3 Bug 3: Failure records missing upstream fields

@@ -3961,7 +3961,38 @@ def watch_run(
         archived = retry_validation_failures(run_dir, manifest, log_file, max_retries=max_retries)
         if archived > 0:
             manifest = load_manifest(run_dir)
-        elif is_run_terminal(manifest, max_retries):
+
+        # Mark FAILED chunks as exhausted if they have no retryable failure files.
+        # This happens after mode switches (realtime→batch) where chunks were marked
+        # FAILED during realtime processing but their units were already rescued by
+        # retry chunks. Without this, is_run_terminal() sees retries=0 < max_retries
+        # and thinks retries remain, causing the watch loop to tick forever.
+        chunks = manifest.get("chunks", {})
+        chunks_dir = run_dir / "chunks"
+        pipeline = manifest.get("pipeline", [])
+        patched_any = False
+        for chunk_name, chunk_data in chunks.items():
+            if chunk_data.get("state") != "FAILED":
+                continue
+            retries = chunk_data.get("retries", chunk_data.get("retry_count", 0))
+            if retries >= max_retries:
+                continue  # Already terminal
+            # Check if any retryable failure files exist for this chunk
+            chunk_dir = chunks_dir / chunk_name
+            has_retryable = False
+            for step in pipeline:
+                failures_file = chunk_dir / f"{step}_failures.jsonl"
+                if failures_file.exists() and failures_file.stat().st_size > 0:
+                    has_retryable = True
+                    break
+            if not has_retryable:
+                chunk_data["retries"] = max_retries
+                log_message(log_file, "STOP", f"{chunk_name}: FAILED with no retryable failures remaining. Marking terminal.")
+                patched_any = True
+        if patched_any:
+            save_manifest(run_dir, manifest)
+
+        if is_run_terminal(manifest, max_retries):
             log_message(log_file, "WATCH", "All chunks already terminal — nothing to do")
             mark_run_complete(run_dir)
             return 0
@@ -5331,7 +5362,32 @@ def realtime_run(
         manifest = load_manifest(run_dir)
         pipeline = manifest["pipeline"]
         chunks = manifest["chunks"]
-    elif is_run_terminal(manifest, max_retries):
+
+    # Mark FAILED chunks as exhausted if they have no retryable failure files.
+    # (See watch_run() for detailed explanation of why this is needed.)
+    chunks_dir = run_dir / "chunks"
+    patched_any = False
+    for chunk_name, chunk_data in chunks.items():
+        if chunk_data.get("state") != "FAILED":
+            continue
+        retries = chunk_data.get("retries", chunk_data.get("retry_count", 0))
+        if retries >= max_retries:
+            continue
+        chunk_dir = chunks_dir / chunk_name
+        has_retryable = False
+        for step in pipeline:
+            failures_file = chunk_dir / f"{step}_failures.jsonl"
+            if failures_file.exists() and failures_file.stat().st_size > 0:
+                has_retryable = True
+                break
+        if not has_retryable:
+            chunk_data["retries"] = max_retries
+            log_message(log_file, "STOP", f"{chunk_name}: FAILED with no retryable failures remaining. Marking terminal.")
+            patched_any = True
+    if patched_any:
+        save_manifest(run_dir, manifest)
+
+    if is_run_terminal(manifest, max_retries):
         log_message(log_file, "REALTIME", "All chunks already terminal — nothing to do")
         mark_run_complete(run_dir)
         return 0
@@ -5887,15 +5943,29 @@ def realtime_run(
 
                 retry_round += 1
 
-            # After retries exhaust, mark any FAILED chunks with 0 valid as terminal.
-            # This ensures is_run_terminal() properly detects completion.
+            # After retries exhaust, mark FAILED chunks as terminal if they have
+            # no retryable work remaining. This covers two cases:
+            # 1. Chunks with 0 valid units (complete failure, no point retrying)
+            # 2. Chunks whose units were rescued by retry chunks (failure files
+            #    consumed, but original chunk still marked FAILED)
             for chunk_name, chunk_data in chunks.items():
-                if chunk_data.get("state") == "FAILED" and chunk_data.get("valid", 0) == 0:
-                    chunk_retries = chunk_data.get("retries", chunk_data.get("retry_count", 0))
-                    if chunk_retries < max_retries:
-                        chunk_data["retries"] = max_retries
-                        log_message(log_file, "STOP", f"{chunk_name}: 0 valid units after retry exhaustion. Marking terminal.")
-                        save_manifest(run_dir, manifest)
+                if chunk_data.get("state") != "FAILED":
+                    continue
+                chunk_retries = chunk_data.get("retries", chunk_data.get("retry_count", 0))
+                if chunk_retries >= max_retries:
+                    continue
+                # Check if any retryable failure files exist
+                chunk_dir = run_dir / "chunks" / chunk_name
+                has_retryable = False
+                for step in pipeline:
+                    failures_file = chunk_dir / f"{step}_failures.jsonl"
+                    if failures_file.exists() and failures_file.stat().st_size > 0:
+                        has_retryable = True
+                        break
+                if not has_retryable:
+                    chunk_data["retries"] = max_retries
+                    log_message(log_file, "STOP", f"{chunk_name}: FAILED with no retryable failures remaining. Marking terminal.")
+                    save_manifest(run_dir, manifest)
 
             # Break step loop if cost cap reached during retries
             if cost_cap_reached:
