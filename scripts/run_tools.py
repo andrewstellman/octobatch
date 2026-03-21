@@ -258,7 +258,12 @@ def repair_run(run_dir: Path) -> dict:
                     for record in load_jsonl(units_file):
                         uid = record.get("unit_id")
                         if uid and uid in missing_ids:
-                            unit_data[uid] = record
+                            # Keep the record with the most fields (richest context).
+                            # Retry chunks can append stripped duplicates to validated
+                            # files; naively taking the last record loses inherited
+                            # context fields needed by downstream templates.
+                            if uid not in unit_data or len(record) > len(unit_data[uid]):
+                                unit_data[uid] = record
         else:
             # Get from previous step's validated output
             prev_step = pipeline[step_idx - 1]
@@ -268,7 +273,12 @@ def repair_run(run_dir: Path) -> dict:
                 for record in load_jsonl(validated_file):
                     uid = record.get("unit_id")
                     if uid and uid in missing_ids:
-                        unit_data[uid] = record
+                        # Keep the record with the most fields (richest context).
+                        # Retry chunks can append stripped duplicates to validated
+                        # files; naively taking the last record loses inherited
+                        # context fields needed by downstream templates.
+                        if uid not in unit_data or len(record) > len(unit_data[uid]):
+                            unit_data[uid] = record
 
         if not unit_data:
             continue
@@ -1071,20 +1081,27 @@ def compare_hands(run_dir1: Path, run_dir2: Path,
 
 
 def _load_step_records(run_dir: Path, step_name: str) -> list[dict]:
-    """Load all validated records for a given step from all chunks."""
+    """Load all validated records for a given step from all chunks.
+
+    When duplicate unit_ids exist (e.g. from retry chunks appending stripped
+    records), keeps the record with the most fields to preserve inherited
+    context needed by downstream templates and analysis tooling.
+    """
     try:
         manifest = load_manifest(run_dir)
     except Exception:
         return []
 
     chunks = manifest.get("chunks", {})
-    records = []
+    best_by_id = {}
     for chunk_name in sorted(chunks.keys()):
         chunk_dir = run_dir / "chunks" / chunk_name
         validated_file = chunk_dir / f"{step_name}_validated.jsonl"
         for record in load_jsonl(validated_file):
-            records.append(record)
-    return records
+            uid = record.get("unit_id")
+            if uid and (uid not in best_by_id or len(record) > len(best_by_id[uid])):
+                best_by_id[uid] = record
+    return list(best_by_id.values())
 
 
 def _format_single_hand_diff(unit_id, r1, r2, name1, name2, model1, model2):

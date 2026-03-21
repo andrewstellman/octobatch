@@ -19,7 +19,7 @@ import pytest
 # Add scripts directory to path so run_tools module is importable
 sys.path.insert(0, str(Path(__file__).parent.parent / "scripts"))
 
-from run_tools import verify_run, repair_run, _verify_step, generate_report
+from run_tools import verify_run, repair_run, _verify_step, generate_report, _load_step_records
 
 
 # =============================================================================
@@ -1419,6 +1419,122 @@ class TestGzipSupport:
         created = result["chunks_created"][0]
         assert created["step"] == "step2"
         assert created["unit_count"] == 2
+
+    def test_repair_keeps_richest_record_when_duplicates_exist(self, tmp_path):
+        """repair_run keeps the record with the most keys when duplicates exist.
+
+        Regression test: retry chunks can append stripped records (just LLM
+        output fields) to *_validated.jsonl alongside the original full record.
+        The old code took the last record, silently discarding inherited context
+        fields like manifestation, wound_description, etc.
+        """
+        run_dir = tmp_path / "repair_dupes"
+        run_dir.mkdir()
+
+        manifest = {
+            "pipeline": ["step1", "step2"],
+            "chunks": {
+                "chunk_000": {
+                    "state": "VALIDATED", "items": 2, "valid": 1,
+                    "failed": 0, "retries": 0, "input_tokens": 0, "output_tokens": 0,
+                }
+            },
+            "metadata": {},
+            "status": "complete",
+            "created": "2024-01-01T00:00:00Z",
+            "updated": "2024-01-01T00:00:00Z",
+        }
+        write_manifest(run_dir, manifest)
+
+        chunk_dir = run_dir / "chunks" / "chunk_000"
+        write_jsonl(chunk_dir / "units.jsonl", [
+            make_unit("u1", data="x"), make_unit("u2", data="y"),
+        ])
+
+        # step1_validated has a rich record (21 keys simulated) followed by
+        # a stripped duplicate (9 keys) for the same unit — mimicking the
+        # retry-append pattern that caused the elena_full_25pro bug.
+        rich_record = make_unit(
+            "u2", text="hello", expression="guarded", wound="ISOLATION",
+            state="fully_active", response_type="neutral",
+            voice_notes="tightened", manifestation="manifestation_1",
+            wound_description="Protective distance", state_description="Fully defended",
+            response_description="Neutral reading", slot_type="single_wound",
+        )
+        stripped_record = make_unit(
+            "u2", text="hello", expression="guarded", wound="ISOLATION",
+            state="fully_active", response_type="neutral",
+            voice_notes="tightened",
+        )
+        write_jsonl(chunk_dir / "step1_validated.jsonl", [
+            make_unit("u1", text="ok", manifestation="m1"),
+            rich_record,
+            stripped_record,  # duplicate — fewer keys, comes last
+        ])
+
+        # Only u1 has step2 results — u2 is missing
+        write_jsonl(chunk_dir / "step2_validated.jsonl", [
+            make_unit("u1", score=5),
+        ])
+
+        result = repair_run(run_dir)
+        assert result["missing_count"] == 1
+
+        # The retry chunk should have the RICH version of u2, not the stripped one
+        retry_chunk = result["chunks_created"][0]["chunk_name"]
+        retry_dir = run_dir / "chunks" / retry_chunk
+        with open(retry_dir / "step1_validated.jsonl") as f:
+            records = [json.loads(l) for l in f if l.strip()]
+        assert len(records) == 1
+        assert records[0]["unit_id"] == "u2"
+        assert records[0].get("manifestation") == "manifestation_1"
+        assert records[0].get("wound_description") == "Protective distance"
+        assert len(records[0]) == len(rich_record)
+
+
+# =============================================================================
+# _load_step_records() dedup tests
+# =============================================================================
+
+class TestLoadStepRecords:
+    """Tests for _load_step_records() duplicate handling."""
+
+    def test_deduplicates_keeping_richest_record(self, tmp_path):
+        """_load_step_records keeps the record with the most keys per unit_id."""
+        run_dir = tmp_path / "load_dedup"
+        run_dir.mkdir()
+
+        manifest = {
+            "pipeline": ["step1"],
+            "chunks": {
+                "chunk_000": {
+                    "state": "VALIDATED", "items": 2, "valid": 2,
+                    "failed": 0, "retries": 0, "input_tokens": 0, "output_tokens": 0,
+                }
+            },
+            "metadata": {},
+            "created": "2024-01-01T00:00:00Z",
+            "updated": "2024-01-01T00:00:00Z",
+        }
+        write_manifest(run_dir, manifest)
+
+        chunk_dir = run_dir / "chunks" / "chunk_000"
+        chunk_dir.mkdir(parents=True, exist_ok=True)
+
+        rich = make_unit("u1", text="hi", manifestation="m1", wound="SHAME", extra="ctx")
+        stripped = make_unit("u1", text="hi")
+        unique = make_unit("u2", text="bye", manifestation="m2")
+
+        write_jsonl(chunk_dir / "step1_validated.jsonl", [rich, stripped, unique])
+
+        records = _load_step_records(run_dir, "step1")
+        by_id = {r["unit_id"]: r for r in records}
+
+        assert len(records) == 2
+        assert by_id["u1"].get("manifestation") == "m1"
+        assert by_id["u1"].get("wound") == "SHAME"
+        assert len(by_id["u1"]) == len(rich)
+        assert by_id["u2"].get("manifestation") == "m2"
 
 
 # =============================================================================
