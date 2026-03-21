@@ -14,7 +14,11 @@ All providers must implement:
 from abc import ABC, abstractmethod
 from enum import Enum
 from pathlib import Path
-from typing import Any, TypedDict, NotRequired
+from typing import Any, TypedDict
+try:
+    from typing import NotRequired
+except ImportError:
+    from typing_extensions import NotRequired
 
 import yaml
 
