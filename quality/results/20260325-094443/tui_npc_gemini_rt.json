@@ -1,0 +1,30 @@
+{
+  "name": "it_20260325-094443_npc_gemini_rt",
+  "status": "complete",
+  "pipeline_name": "NPCDialog",
+  "provider": "gemini",
+  "model": "gemini-2.0-flash-001",
+  "mode": "realtime",
+  "total_units": 12,
+  "valid_units": 12,
+  "failed_units": 0,
+  "cost": 0.003393,
+  "total_tokens": 21390,
+  "input_tokens": 15712,
+  "output_tokens": 5678,
+  "duration": "3m 3s",
+  "steps": [
+    {
+      "name": "generate_dialog",
+      "valid": 12,
+      "total": 12,
+      "state": "complete"
+    },
+    {
+      "name": "score_consistency",
+      "valid": 12,
+      "total": 12,
+      "state": "complete"
+    }
+  ]
+}

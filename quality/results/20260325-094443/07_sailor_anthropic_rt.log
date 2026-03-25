@@ -1,0 +1,84 @@
+[09:52:36] [INIT] Starting new run
+[09:52:36] [INIT] Command: ./scripts/orchestrate.py --init --pipeline DrunkenSailor --run-dir ./runs/it_20260325-094443_sailor_anthropic_rt --realtime --provider anthropic --max-units 15 --yes
+[09:52:36] [INIT] Config: /Users/andrewstellman/Documents/Game/octobatch-awesome-copilot/pipelines/DrunkenSailor/config.yaml
+[09:52:36] [INIT] Provider override: anthropic
+[09:52:36] [INIT] Applied overrides: provider=anthropic, model=None
+[09:52:36] [INIT] Copied item source: items.yaml
+[09:52:36] [INIT] Copied templates directory: templates
+[09:52:36] [INIT] Copied schemas directory: schemas
+[09:52:36] [INIT] Config snapshot saved to run directory
+[09:52:36] [INIT] Generated 15 units (1 base × 100 repetitions, limited from 100)
+[09:52:37] [INIT] Created 1 chunks (chunk_size=100)
+[09:52:37] [INIT] Pipeline: random_walk -> analyze
+[09:52:37] [INIT] Run initialized successfully
+[09:52:37] [REALTIME] Anthropic API key: AVAILABLE
+[09:52:37] [REALTIME] Starting real-time execution
+[09:52:37] [REALTIME] Running random_walk with anthropic/claude-sonnet-4-20250514 (default)
+Run initialized: runs/it_20260325-094443_sailor_anthropic_rt
+  Units: 15
+  Chunks: 1
+  Pipeline: random_walk -> analyze
+[09:52:37] Real-time mode (2x cost)
+[09:52:37] Running random_walk with anthropic/claude-sonnet-4-20250514 (default)
+[09:52:37] Running random_walk (15 units)...
+[09:52:37] [1/15] start_at_5__rep0000 ✓
+[09:52:37] [2/15] start_at_5__rep0001 ✓
+[09:52:37] [3/15] start_at_5__rep0002 ✓
+[09:52:37] [4/15] start_at_5__rep0003 ✓
+[09:52:37] [5/15] start_at_5__rep0004 ✓
+[09:52:37] [6/15] start_at_5__rep0005 ✓
+[09:52:37] [7/15] start_at_5__rep0006 ✓
+[09:52:37] [8/15] start_at_5__rep0007 ✓
+[09:52:37] [9/15] start_at_5__rep0008 ✓
+[09:52:37] [10/15] start_at_5__rep0009 ✓
+[09:52:37] [11/15] start_at_5__rep0010 ✓
+[09:52:37] [12/15] start_at_5__rep0011 ✓
+[09:52:37] [13/15] start_at_5__rep0012 ✓
+[09:52:37] [14/15] start_at_5__rep0013 ✓
+[09:52:37] [15/15] start_at_5__rep0014 ✓
+[09:52:37] [REALTIME] Running analyze with anthropic/claude-sonnet-4-20250514 (default)
+[09:52:37] random_walk: 15/15 valid (0.1s) | 0 tokens | $0.0000
+[09:52:37] Running analyze with anthropic/claude-sonnet-4-20250514 (default)
+[09:52:37] Running analyze (15 units)...
+[09:52:39] [1/15] start_at_5__rep0000 ✓ | 366 tokens | $0.0023 | ~27s left
+[09:52:41] [2/15] start_at_5__rep0001 ✓ | 710 tokens | $0.0043 | ~27s left
+[09:52:46] [3/15] start_at_5__rep0002 ✓ | 1,654 tokens | $0.0118 | ~35s left
+[09:52:49] [4/15] start_at_5__rep0003 ✓ | 2,118 tokens | $0.0150 | ~32s left
+[09:52:52] [5/15] start_at_5__rep0004 ✓ | 2,460 tokens | $0.0170 | ~28s left
+[09:52:54] [6/15] start_at_5__rep0005 ✓ | 2,778 tokens | $0.0188 | ~24s left
+[09:52:56] [7/15] start_at_5__rep0006 ✓ | 3,132 tokens | $0.0210 | ~21s left
+[09:52:59] [8/15] start_at_5__rep0007 ✓ | 3,642 tokens | $0.0246 | ~19s left
+[09:53:03] [9/15] start_at_5__rep0008 ✓ | 4,428 tokens | $0.0306 | ~17s left
+[09:53:06] [10/15] start_at_5__rep0009 ✓ | 4,820 tokens | $0.0331 | ~14s left
+[09:53:09] [11/15] start_at_5__rep0010 ✓ | 5,392 tokens | $0.0372 | ~11s left
+[09:53:12] [12/15] start_at_5__rep0011 ✓ | 6,010 tokens | $0.0418 | ~8s left
+[09:53:14] [13/15] start_at_5__rep0012 ✓ | 6,340 tokens | $0.0437 | ~5s left
+[09:53:17] [14/15] start_at_5__rep0013 ✓ | 6,756 tokens | $0.0464 | ~2s left
+[09:53:21] [15/15] start_at_5__rep0014 ✓ | 7,446 tokens | $0.0516
+[09:53:21] [VALIDATE] chunk_000/analyze: Starting validation of 15 units (timeout=600s)
+[09:53:21] [VALIDATE] chunk_000/analyze: Running schema validation...
+[09:53:21] [VALIDATE] chunk_000/analyze: Schema validation complete: 15 passed, 0 failed (0.1s)
+[09:53:21] [VALIDATE] chunk_000/analyze: Running business logic validation on 15 records (599s remaining)...
+[09:53:21] [VALIDATE] chunk_000/analyze: Subprocess pipeline complete (0.2s)
+[09:53:21] [VALIDATE] chunk_000: Writing unit 10/15 (Last 10 took 0.00s)
+[09:53:21] [VALIDATE] chunk_000/analyze: Validation complete: 15 valid, 0 failed
+[09:53:21] [POST-PROCESS] Running: Outcome Distribution...
+[09:53:21] [POST-PROCESS] Outcome Distribution: Output written to runs/it_20260325-094443_sailor_anthropic_rt/outcome_distribution.txt
+[09:53:21] [POST-PROCESS] Outcome Distribution: Loading results from runs/it_20260325-094443_sailor_anthropic_rt...
+[09:53:21] [POST-PROCESS] Outcome Distribution: Reading final step 'analyze' results...
+[09:53:21] [POST-PROCESS] Outcome Distribution: Loaded 15 results
+[09:53:21] [POST-PROCESS] Running: Steps by Scenario...
+[09:53:21] [POST-PROCESS] Steps by Scenario: Output written to runs/it_20260325-094443_sailor_anthropic_rt/steps_by_scenario.txt
+[09:53:21] [POST-PROCESS] Steps by Scenario: Loading results from runs/it_20260325-094443_sailor_anthropic_rt...
+[09:53:21] [POST-PROCESS] Steps by Scenario: Reading final step 'analyze' results...
+[09:53:21] [POST-PROCESS] Steps by Scenario: Loaded 15 results
+[09:53:21] [POST-PROCESS] Running: Steps by Outcome...
+[09:53:21] [POST-PROCESS] Steps by Outcome: Output written to runs/it_20260325-094443_sailor_anthropic_rt/steps_by_outcome.txt
+[09:53:21] [POST-PROCESS] Steps by Outcome: Loading results from runs/it_20260325-094443_sailor_anthropic_rt...
+[09:53:21] [POST-PROCESS] Steps by Outcome: Reading final step 'analyze' results...
+[09:53:21] [POST-PROCESS] Steps by Outcome: Loaded 15 results
+[09:53:21] [REALTIME] Complete: 30 valid, 0 retried, 0 failed, cost=$0.0516
+[09:53:21] [COMPLETE] Run completed successfully
+[09:53:21] analyze: 15/15 valid (43.7s) | 7,446 tokens | $0.0516
+[09:53:21] Pipeline complete: 30 valid, 0 failed
+[09:53:21] Total: 7,446 tokens (5,007 in + 2,439 out) | $0.0516

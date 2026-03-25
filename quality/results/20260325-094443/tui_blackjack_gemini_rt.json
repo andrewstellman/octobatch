@@ -1,0 +1,48 @@
+{
+  "name": "it_20260325-094443_blackjack_gemini_rt",
+  "status": "complete",
+  "pipeline_name": "Blackjack",
+  "provider": "gemini",
+  "model": "gemini-2.0-flash-001",
+  "mode": "realtime",
+  "total_units": 15,
+  "valid_units": 12,
+  "failed_units": 3,
+  "cost": 0.001336,
+  "total_tokens": 34006,
+  "input_tokens": 29065,
+  "output_tokens": 4941,
+  "duration": "55s",
+  "steps": [
+    {
+      "name": "deal_cards",
+      "valid": 12,
+      "total": 15,
+      "state": "complete"
+    },
+    {
+      "name": "play_hand",
+      "valid": 12,
+      "total": 15,
+      "state": "complete"
+    },
+    {
+      "name": "verify_hand",
+      "valid": 12,
+      "total": 15,
+      "state": "complete"
+    },
+    {
+      "name": "verify_strategy",
+      "valid": 12,
+      "total": 15,
+      "state": "complete"
+    },
+    {
+      "name": "analyze_difficulty",
+      "valid": 12,
+      "total": 15,
+      "state": "complete"
+    }
+  ]
+}

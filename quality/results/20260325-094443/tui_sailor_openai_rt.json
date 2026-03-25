@@ -1,0 +1,30 @@
+{
+  "name": "it_20260325-094443_sailor_openai_rt",
+  "status": "complete",
+  "pipeline_name": "DrunkenSailor",
+  "provider": "openai",
+  "model": "gpt-4o-mini",
+  "mode": "realtime",
+  "total_units": 15,
+  "valid_units": 15,
+  "failed_units": 0,
+  "cost": 0.002056,
+  "total_tokens": 6900,
+  "input_tokens": 4632,
+  "output_tokens": 2268,
+  "duration": "2m 47s",
+  "steps": [
+    {
+      "name": "random_walk",
+      "valid": 15,
+      "total": 15,
+      "state": "complete"
+    },
+    {
+      "name": "analyze",
+      "valid": 15,
+      "total": 15,
+      "state": "complete"
+    }
+  ]
+}

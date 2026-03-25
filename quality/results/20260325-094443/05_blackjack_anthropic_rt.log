@@ -1,0 +1,161 @@
+[09:48:26] [INIT] Starting new run
+[09:48:26] [INIT] Command: ./scripts/orchestrate.py --init --pipeline Blackjack --run-dir ./runs/it_20260325-094443_blackjack_anthropic_rt --realtime --provider anthropic --max-units 15 --yes
+[09:48:26] [INIT] Config: /Users/andrewstellman/Documents/Game/octobatch-awesome-copilot/pipelines/Blackjack/config.yaml
+[09:48:26] [INIT] Provider override: anthropic
+[09:48:26] [INIT] Applied overrides: provider=anthropic, model=None
+[09:48:26] [INIT] Copied item source: items.yaml
+[09:48:26] [INIT] Copied templates directory: templates
+[09:48:26] [INIT] Copied schemas directory: schemas
+[09:48:26] [INIT] Config snapshot saved to run directory
+[09:48:27] [INIT] Generated 15 units (3 base × 300 repetitions, limited from 900)
+[09:48:27] [INIT] Created 1 chunks (chunk_size=100)
+[09:48:27] [INIT] Pipeline: deal_cards -> play_hand -> verify_hand -> verify_strategy -> analyze_difficulty
+[09:48:27] [INIT] Run initialized successfully
+[09:48:27] [REALTIME] Anthropic API key: AVAILABLE
+[09:48:27] [REALTIME] Starting real-time execution
+[09:48:27] [REALTIME] Running deal_cards with anthropic/claude-sonnet-4-20250514 (default)
+Run initialized: runs/it_20260325-094443_blackjack_anthropic_rt
+  Units: 15
+  Chunks: 1
+  Pipeline: deal_cards -> play_hand -> verify_hand -> verify_strategy -> analyze_difficulty
+[09:48:27] Real-time mode (2x cost)
+[09:48:27] Running deal_cards with anthropic/claude-sonnet-4-20250514 (default)
+[09:48:27] Running deal_cards (15 units)...
+[09:48:27] [1/15] the_pro__rep0000 ✓
+[09:48:27] [2/15] the_gambler__rep0000 ✓
+[09:48:27] [3/15] the_coward__rep0000 ✓
+[09:48:27] [4/15] the_pro__rep0001 ✓
+[09:48:27] [5/15] the_gambler__rep0001 ✓
+[09:48:27] [6/15] the_coward__rep0001 ✓
+[09:48:27] [7/15] the_pro__rep0002 ✓
+[09:48:27] [8/15] the_gambler__rep0002 ✓
+[09:48:27] [9/15] the_coward__rep0002 ✓
+[09:48:27] [10/15] the_pro__rep0003 ✓
+[09:48:27] [11/15] the_gambler__rep0003 ✓
+[09:48:27] [12/15] the_coward__rep0003 ✓
+[09:48:27] [13/15] the_pro__rep0004 ✓
+[09:48:27] [14/15] the_gambler__rep0004 ✓
+[09:48:27] [15/15] the_coward__rep0004 ✓
+[09:48:27] [REALTIME] Running play_hand with anthropic/claude-sonnet-4-20250514 (default)
+[09:48:27] deal_cards: 15/15 valid (0.0s) | 0 tokens | $0.0000
+[09:48:27] Running play_hand with anthropic/claude-sonnet-4-20250514 (default)
+[09:48:27] Running play_hand (15 units)...
+[09:48:32] [1/15] the_pro__rep0000 ✓ | 1,899 tokens | $0.0089 | ~1m 8s left
+[09:48:38] [2/15] the_gambler__rep0000 ✓ | 3,817 tokens | $0.0184 | ~1m 10s left
+[09:48:42] [3/15] the_coward__rep0000 ✓ | 5,640 tokens | $0.0268 | ~58s left
+[09:48:47] [4/15] the_pro__rep0001 ✓ | 7,498 tokens | $0.0351 | ~55s left
+[09:48:53] [5/15] the_gambler__rep0001 ✓ | 9,426 tokens | $0.0447 | ~52s left
+[09:48:58] [6/15] the_coward__rep0001 ✓ | 11,228 tokens | $0.0529 | ~46s left
+[09:50:53] [7/15] the_pro__rep0002 ✓ | 13,113 tokens | $0.0616 | ~2m 46s left
+[09:50:58] [8/15] the_gambler__rep0002 ✓ | 14,973 tokens | $0.0702 | ~2m 11s left
+[09:51:02] [9/15] the_coward__rep0002 ✓ | 16,808 tokens | $0.0789 | ~1m 43s left
+[09:51:07] [10/15] the_pro__rep0003 ✓ | 18,709 tokens | $0.0878 | ~1m 20s left
+[09:51:11] [11/15] the_gambler__rep0003 ✓ | 20,535 tokens | $0.0959 | ~59s left
+[09:51:16] [12/15] the_coward__rep0003 ✓ | 22,350 tokens | $0.1042 | ~42s left
+[09:51:21] [13/15] the_pro__rep0004 ✓ | 24,263 tokens | $0.1133 | ~26s left
+[09:51:25] [14/15] the_gambler__rep0004 ✓ | 26,095 tokens | $0.1214 | ~12s left
+[09:51:28] [15/15] the_coward__rep0004 ✓ | 27,879 tokens | $0.1293
+[09:51:28] [VALIDATE] chunk_000/play_hand: Starting validation of 15 units (timeout=600s)
+[09:51:28] [VALIDATE] chunk_000/play_hand: Running schema validation...
+[09:51:29] [VALIDATE] chunk_000/play_hand: Schema validation complete: 15 passed, 0 failed (0.2s)
+[09:51:29] [VALIDATE] chunk_000/play_hand: Running business logic validation on 15 records (599s remaining)...
+[09:51:29] [VALIDATE] chunk_000/play_hand: Subprocess pipeline complete (0.3s)
+[09:51:29] [VALIDATE] chunk_000: Writing unit 10/15 (Last 10 took 0.00s)
+[09:51:29] [VALIDATE] chunk_000/play_hand: Validation complete: 15 valid, 0 failed
+[09:51:29] [REALTIME] Running verify_hand with anthropic/claude-sonnet-4-20250514 (default)
+[09:51:29] play_hand: 15/15 valid (181.5s) | 27,879 tokens | $0.1293
+[09:51:29] Running verify_hand with anthropic/claude-sonnet-4-20250514 (default)
+[09:51:29] Running verify_hand (15 units)...
+[09:51:29] [1/15] the_pro__rep0000 ✓
+[09:51:29] [2/15] the_gambler__rep0000 ✓
+[09:51:29] [3/15] the_coward__rep0000 ✓
+[09:51:29] [4/15] the_pro__rep0001 ✓
+[09:51:29] [5/15] the_gambler__rep0001 ✓
+[09:51:29] [6/15] the_coward__rep0001 ✓
+[09:51:29] [7/15] the_pro__rep0002 ✓
+[09:51:29] [8/15] the_gambler__rep0002 ✓
+[09:51:29] [9/15] the_coward__rep0002 ✓
+[09:51:29] [10/15] the_pro__rep0003 ✓
+[09:51:29] [11/15] the_gambler__rep0003 ✓
+[09:51:29] [12/15] the_coward__rep0003 ✓
+[09:51:29] [13/15] the_pro__rep0004 ✓
+[09:51:29] [14/15] the_gambler__rep0004 ✓
+[09:51:29] [15/15] the_coward__rep0004 ✓
+[09:51:29] [EXPRESSION] chunk_000: Running validation for expression step 'verify_hand'
+[09:51:29] [VALIDATE] chunk_000/verify_hand: Starting validation of 15 units (timeout=600s)
+[09:51:29] [VALIDATE] chunk_000/verify_hand: Running business logic validation (no schema)...
+[09:51:29] [VALIDATE] chunk_000/verify_hand: Subprocess pipeline complete (0.1s)
+[09:51:29] [VALIDATE] chunk_000: Writing unit 10/15 (Last 10 took 0.00s)
+[09:51:29] [VALIDATE] chunk_000/verify_hand: Validation complete: 15 valid, 0 failed
+[09:51:29] [REALTIME] Running verify_strategy with anthropic/claude-sonnet-4-20250514 (default)
+[09:51:29] verify_hand: 15/15 valid (0.1s) | 0 tokens | $0.0000
+[09:51:29] Running verify_strategy with anthropic/claude-sonnet-4-20250514 (default)
+[09:51:29] Running verify_strategy (15 units)...
+[09:51:29] [1/15] the_pro__rep0000 ✓
+[09:51:29] [2/15] the_gambler__rep0000 ✓
+[09:51:29] [3/15] the_coward__rep0000 ✓
+[09:51:29] [4/15] the_pro__rep0001 ✓
+[09:51:29] [5/15] the_gambler__rep0001 ✓
+[09:51:29] [6/15] the_coward__rep0001 ✓
+[09:51:29] [7/15] the_pro__rep0002 ✓
+[09:51:29] [8/15] the_gambler__rep0002 ✓
+[09:51:29] [9/15] the_coward__rep0002 ✓
+[09:51:29] [10/15] the_pro__rep0003 ✓
+[09:51:29] [11/15] the_gambler__rep0003 ✓
+[09:51:29] [12/15] the_coward__rep0003 ✓
+[09:51:29] [13/15] the_pro__rep0004 ✓
+[09:51:29] [14/15] the_gambler__rep0004 ✓
+[09:51:29] [15/15] the_coward__rep0004 ✓
+[09:51:29] [EXPRESSION] chunk_000: Running validation for expression step 'verify_strategy'
+[09:51:29] [VALIDATE] chunk_000/verify_strategy: Starting validation of 15 units (timeout=600s)
+[09:51:29] [VALIDATE] chunk_000/verify_strategy: Running business logic validation (no schema)...
+[09:51:29] [VALIDATE] chunk_000/verify_strategy: Subprocess pipeline complete (0.1s)
+[09:51:29] [VALIDATE] chunk_000: Writing unit 10/15 (Last 10 took 0.00s)
+[09:51:29] [VALIDATE] chunk_000/verify_strategy: Validation complete: 15 valid, 0 failed
+[09:51:29] [REALTIME] Running analyze_difficulty with anthropic/claude-sonnet-4-20250514 (default)
+[09:51:29] verify_strategy: 15/15 valid (0.1s) | 0 tokens | $0.0000
+[09:51:29] Running analyze_difficulty with anthropic/claude-sonnet-4-20250514 (default)
+[09:51:29] Running analyze_difficulty (15 units)...
+[09:51:33] [1/15] the_pro__rep0000 ✓ | 648 tokens | $0.0033 | ~50s left
+[09:51:37] [2/15] the_gambler__rep0000 ✓ | 1,318 tokens | $0.0066 | ~50s left
+[09:51:40] [3/15] the_coward__rep0000 ✓ | 1,909 tokens | $0.0093 | ~44s left
+[09:51:43] [4/15] the_pro__rep0001 ✓ | 2,472 tokens | $0.0118 | ~39s left
+[09:51:47] [5/15] the_gambler__rep0001 ✓ | 3,130 tokens | $0.0147 | ~35s left
+[09:51:51] [6/15] the_coward__rep0001 ✓ | 3,726 tokens | $0.0176 | ~33s left
+[09:51:54] [7/15] the_pro__rep0002 ✓ | 4,319 tokens | $0.0203 | ~29s left
+[09:51:58] [8/15] the_gambler__rep0002 ✓ | 4,928 tokens | $0.0232 | ~25s left
+[09:52:02] [9/15] the_coward__rep0002 ✓ | 5,557 tokens | $0.0264 | ~21s left
+[09:52:05] [10/15] the_pro__rep0003 ✓ | 6,167 tokens | $0.0291 | ~17s left
+[09:52:09] [11/15] the_gambler__rep0003 ✓ | 6,763 tokens | $0.0322 | ~14s left
+[09:52:13] [12/15] the_coward__rep0003 ✓ | 7,357 tokens | $0.0350 | ~11s left
+[09:52:16] [13/15] the_pro__rep0004 ✓ | 7,983 tokens | $0.0379 | ~7s left
+[09:52:19] [14/15] the_gambler__rep0004 ✓ | 8,557 tokens | $0.0406 | ~3s left
+[09:52:23] [15/15] the_coward__rep0004 ✓ | 9,118 tokens | $0.0432
+[09:52:23] [VALIDATE] chunk_000/analyze_difficulty: Starting validation of 15 units (timeout=600s)
+[09:52:23] [VALIDATE] chunk_000/analyze_difficulty: Running schema validation...
+[09:52:23] [VALIDATE] chunk_000/analyze_difficulty: Schema validation complete: 15 passed, 0 failed (0.2s)
+[09:52:23] [VALIDATE] chunk_000/analyze_difficulty: Running business logic validation on 15 records (599s remaining)...
+[09:52:23] [VALIDATE] chunk_000/analyze_difficulty: Subprocess pipeline complete (0.2s)
+[09:52:23] [VALIDATE] chunk_000: Writing unit 10/15 (Last 10 took 0.00s)
+[09:52:23] [VALIDATE] chunk_000/analyze_difficulty: Validation complete: 15 valid, 0 failed
+[09:52:23] [POST-PROCESS] Running: Strategy Comparison...
+[09:52:23] [POST-PROCESS] Strategy Comparison: Output written to runs/it_20260325-094443_blackjack_anthropic_rt/strategy_comparison.txt
+[09:52:23] [POST-PROCESS] Strategy Comparison: Loading results from runs/it_20260325-094443_blackjack_anthropic_rt...
+[09:52:23] [POST-PROCESS] Strategy Comparison: Reading final step 'analyze_difficulty' results...
+[09:52:23] [POST-PROCESS] Strategy Comparison: Loaded 15 results
+[09:52:23] [POST-PROCESS] Running: Difficulty Analysis...
+[09:52:23] [POST-PROCESS] Difficulty Analysis: Output written to runs/it_20260325-094443_blackjack_anthropic_rt/difficulty_analysis.txt
+[09:52:23] [POST-PROCESS] Difficulty Analysis: Loading results from runs/it_20260325-094443_blackjack_anthropic_rt...
+[09:52:23] [POST-PROCESS] Difficulty Analysis: Reading final step 'analyze_difficulty' results...
+[09:52:23] [POST-PROCESS] Difficulty Analysis: Loaded 15 results
+[09:52:23] [POST-PROCESS] Running: Results CSV...
+[09:52:23] [POST-PROCESS] Results CSV: Output written to runs/it_20260325-094443_blackjack_anthropic_rt/results.csv
+[09:52:23] [POST-PROCESS] Results CSV: Loading results from runs/it_20260325-094443_blackjack_anthropic_rt...
+[09:52:23] [POST-PROCESS] Results CSV: Reading final step 'analyze_difficulty' results...
+[09:52:23] [POST-PROCESS] Results CSV: Loaded 15 results
+[09:52:23] [REALTIME] Complete: 75 valid, 0 retried, 0 failed, cost=$0.1725
+[09:52:23] [COMPLETE] Run completed successfully
+[09:52:23] analyze_difficulty: 15/15 valid (54.1s) | 9,118 tokens | $0.0432
+[09:52:23] [POST-PROCESS] Compress Raw Results: Compressed 5 file(s)
+[09:52:23] Pipeline complete: 75 valid, 0 failed
+[09:52:23] Total: 36,997 tokens (31,870 in + 5,127 out) | $0.1725

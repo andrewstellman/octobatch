@@ -1,0 +1,48 @@
+{
+  "name": "it_20260325-094443_blackjack_openai_rt",
+  "status": "complete",
+  "pipeline_name": "Blackjack",
+  "provider": "openai",
+  "model": "gpt-4o-mini",
+  "mode": "realtime",
+  "total_units": 15,
+  "valid_units": 11,
+  "failed_units": 4,
+  "cost": 0.00127,
+  "total_tokens": 38332,
+  "input_tokens": 33233,
+  "output_tokens": 5099,
+  "duration": "2m 23s",
+  "steps": [
+    {
+      "name": "deal_cards",
+      "valid": 11,
+      "total": 15,
+      "state": "complete"
+    },
+    {
+      "name": "play_hand",
+      "valid": 11,
+      "total": 15,
+      "state": "complete"
+    },
+    {
+      "name": "verify_hand",
+      "valid": 11,
+      "total": 15,
+      "state": "complete"
+    },
+    {
+      "name": "verify_strategy",
+      "valid": 11,
+      "total": 15,
+      "state": "complete"
+    },
+    {
+      "name": "analyze_difficulty",
+      "valid": 11,
+      "total": 15,
+      "state": "complete"
+    }
+  ]
+}

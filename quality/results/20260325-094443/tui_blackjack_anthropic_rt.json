@@ -1,0 +1,48 @@
+{
+  "name": "it_20260325-094443_blackjack_anthropic_rt",
+  "status": "complete",
+  "pipeline_name": "Blackjack",
+  "provider": "anthropic",
+  "model": "claude-sonnet-4-20250514",
+  "mode": "realtime",
+  "total_units": 15,
+  "valid_units": 15,
+  "failed_units": 0,
+  "cost": 0.043206,
+  "total_tokens": 36997,
+  "input_tokens": 31870,
+  "output_tokens": 5127,
+  "duration": "3m 56s",
+  "steps": [
+    {
+      "name": "deal_cards",
+      "valid": 15,
+      "total": 15,
+      "state": "complete"
+    },
+    {
+      "name": "play_hand",
+      "valid": 15,
+      "total": 15,
+      "state": "complete"
+    },
+    {
+      "name": "verify_hand",
+      "valid": 15,
+      "total": 15,
+      "state": "complete"
+    },
+    {
+      "name": "verify_strategy",
+      "valid": 15,
+      "total": 15,
+      "state": "complete"
+    },
+    {
+      "name": "analyze_difficulty",
+      "valid": 15,
+      "total": 15,
+      "state": "complete"
+    }
+  ]
+}
