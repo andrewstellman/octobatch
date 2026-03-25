@@ -1,0 +1,23 @@
+{
+  "pipeline": "NPCDialog",
+  "final_step": "score_consistency",
+  "validated_count": 0,
+  "failure_count": 0,
+  "status": "running",
+  "checks": {
+    "tone_valid_enum": {
+      "pass": false,
+      "detail": "No validated records"
+    },
+    "personality_above_gate": {
+      "pass": false,
+      "detail": "No validated records"
+    },
+    "mood_responsiveness_above_gate": {
+      "pass": false,
+      "detail": "No validated records"
+    }
+  },
+  "cost": 0.0,
+  "duration": "--"
+}

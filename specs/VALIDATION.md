@@ -336,7 +336,7 @@ The TUI's retry function (`reset_unit_retries()` in `runs.py`):
 
 ### Retry Count Tracking
 
-Each failure record's `retry_count` increments on each attempt. After `api.retry.max_attempts` (or `processing.validation_retry.max_attempts`), the unit stays in the failures file permanently.
+Each failure record's `retry_count` increments on each attempt within a single `--realtime` invocation. At the start of a new `--realtime` invocation, the orchestrator resets persisted `retry_count` values and grants a fresh retry budget for that invocation. Within any one invocation, once a record reaches `api.retry.max_attempts` (or `processing.validation_retry.max_attempts`), it stays in the failures file for the rest of that invocation.
 
 ---
 

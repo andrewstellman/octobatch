@@ -1,0 +1,183 @@
+[11:57:47] [WATCH] Gemini API key (GOOGLE_API_KEY): AVAILABLE
+[11:57:48] [BATCH] Running random_walk with gemini/gemini-2.0-flash-001 (default)
+[11:57:48] [EXPRESSION] chunk_000: Running expression step 'random_walk' locally
+[11:57:48] [EXPRESSION] chunk_000: random_walk complete (100 valid, 0 failed) -> analyze_PENDING
+[11:57:48] [STEP] Advancing to analyze (step 2/2)
+[11:57:53] [BATCH] Running analyze with gemini/gemini-2.0-flash-001 (default)
+[11:57:56] [SUBMIT] chunk_000: analyze_PENDING -> analyze_SUBMITTED (batches/bpo855gqo87l20d3c99lpz277ao65frvl6g8)
+[11:57:56] [INFO] Batch submitted. Typical wait: 5-20min depending on provider and batch size.
+[11:57:56] [STEP] Advancing to analyze (step 2/2)
+[11:57:56] [TICK] 0 collected, 1 submitted | step: analyze | 0/1 chunks complete | $0.00 spent
+[11:58:01] [POLL] chunk_000: analyze_SUBMITTED -> pending (None, 5s elapsed)
+[11:58:01] [STEP] Advancing to analyze (step 2/2)
+[11:58:01] [TICK] 0 collected, 0 submitted | step: analyze | 0/1 chunks complete | $0.00 spent
+[11:58:06] [STEP] Advancing to analyze (step 2/2)
+[11:58:12] [STEP] Advancing to analyze (step 2/2)
+[11:58:18] [STEP] Advancing to analyze (step 2/2)
+[11:58:24] [STEP] Advancing to analyze (step 2/2)
+[11:58:30] [STEP] Advancing to analyze (step 2/2)
+[11:58:35] [STEP] Advancing to analyze (step 2/2)
+[11:58:41] [STEP] Advancing to analyze (step 2/2)
+[11:58:47] [STEP] Advancing to analyze (step 2/2)
+[11:58:52] [STEP] Advancing to analyze (step 2/2)
+[11:58:58] [STEP] Advancing to analyze (step 2/2)
+[11:59:04] [STEP] Advancing to analyze (step 2/2)
+[11:59:04] [TICK] Idle 1m02s | analyze: 0/1 chunks (1 submitted, 0 pending) | $0.00 spent
+[11:59:09] [STEP] Advancing to analyze (step 2/2)
+[11:59:15] [STEP] Advancing to analyze (step 2/2)
+[11:59:21] [STEP] Advancing to analyze (step 2/2)
+[11:59:27] [STEP] Advancing to analyze (step 2/2)
+[11:59:33] [STEP] Advancing to analyze (step 2/2)
+[11:59:38] [STEP] Advancing to analyze (step 2/2)
+[11:59:44] [STEP] Advancing to analyze (step 2/2)
+[11:59:50] [STEP] Advancing to analyze (step 2/2)
+[11:59:55] [STEP] Advancing to analyze (step 2/2)
+[12:00:01] [STEP] Advancing to analyze (step 2/2)
+[12:00:06] [STEP] Advancing to analyze (step 2/2)
+[12:00:06] [TICK] Idle 1m02s | analyze: 0/1 chunks (1 submitted, 0 pending) | $0.00 spent
+[12:00:11] [STEP] Advancing to analyze (step 2/2)
+[12:00:17] [STEP] Advancing to analyze (step 2/2)
+[12:00:22] [STEP] Advancing to analyze (step 2/2)
+[12:00:28] [STEP] Advancing to analyze (step 2/2)
+[12:00:33] [STEP] Advancing to analyze (step 2/2)
+[12:00:38] [STEP] Advancing to analyze (step 2/2)
+[12:00:44] [STEP] Advancing to analyze (step 2/2)
+[12:00:49] [STEP] Advancing to analyze (step 2/2)
+[12:00:54] [STEP] Advancing to analyze (step 2/2)
+[12:01:00] [STEP] Advancing to analyze (step 2/2)
+[12:01:05] [STEP] Advancing to analyze (step 2/2)
+[12:01:10] [STEP] Advancing to analyze (step 2/2)
+[12:01:10] [TICK] Idle 1m04s | analyze: 0/1 chunks (1 submitted, 0 pending) | $0.00 spent
+[12:01:16] [POLL] chunk_000: analyze_SUBMITTED -> running (None, 3m elapsed)
+[12:01:16] [STEP] Advancing to analyze (step 2/2)
+[12:01:16] [TICK] 0 collected, 0 submitted | step: analyze | 0/1 chunks complete | $0.00 spent
+[12:01:21] [STEP] Advancing to analyze (step 2/2)
+[12:01:26] [STEP] Advancing to analyze (step 2/2)
+[12:01:32] [STEP] Advancing to analyze (step 2/2)
+[12:01:37] [STEP] Advancing to analyze (step 2/2)
+[12:01:42] [STEP] Advancing to analyze (step 2/2)
+[12:01:48] [STEP] Advancing to analyze (step 2/2)
+[12:01:53] [STEP] Advancing to analyze (step 2/2)
+[12:01:59] [STEP] Advancing to analyze (step 2/2)
+[12:02:04] [STEP] Advancing to analyze (step 2/2)
+[12:02:09] [STEP] Advancing to analyze (step 2/2)
+[12:02:15] [STEP] Advancing to analyze (step 2/2)
+[12:02:20] [STEP] Advancing to analyze (step 2/2)
+[12:02:20] [TICK] Idle 1m04s | analyze: 0/1 chunks (1 submitted, 0 pending) | $0.00 spent
+[12:02:26] [STEP] Advancing to analyze (step 2/2)
+[12:02:31] [STEP] Advancing to analyze (step 2/2)
+[12:02:36] [STEP] Advancing to analyze (step 2/2)
+[12:02:42] [STEP] Advancing to analyze (step 2/2)
+[12:02:47] [STEP] Advancing to analyze (step 2/2)
+[12:02:53] [STEP] Advancing to analyze (step 2/2)
+[12:02:58] [STEP] Advancing to analyze (step 2/2)
+[12:03:03] [STEP] Advancing to analyze (step 2/2)
+[12:03:09] [STEP] Advancing to analyze (step 2/2)
+[12:03:14] [STEP] Advancing to analyze (step 2/2)
+[12:03:20] [STEP] Advancing to analyze (step 2/2)
+[12:03:25] [POLL] chunk_000: analyze_SUBMITTED -> completed (None, 5m elapsed)
+[12:03:26] [COLLECT] chunk_000: Downloaded 100 results
+[12:03:26] [TOKENS] chunk_000: 29525 input, 13995 output tokens
+[12:03:26] [VALIDATE] chunk_000/analyze: Starting validation of 100 units (timeout=600s)
+[12:03:26] [VALIDATE] chunk_000/analyze: Running schema validation...
+[12:03:26] [VALIDATE] chunk_000/analyze: Schema validation complete: 100 passed, 0 failed (0.2s)
+[12:03:26] [VALIDATE] chunk_000/analyze: Running business logic validation on 100 records (599s remaining)...
+[12:03:27] [VALIDATE] chunk_000/analyze: Subprocess pipeline complete (0.3s)
+[12:03:27] [VALIDATE] chunk_000: Writing unit 10/100 (Last 10 took 0.00s)
+[12:03:27] [VALIDATE] chunk_000: Writing unit 20/100 (Last 10 took 0.00s)
+[12:03:27] [VALIDATE] chunk_000: Writing unit 30/100 (Last 10 took 0.00s)
+[12:03:27] [VALIDATE] chunk_000: Writing unit 40/100 (Last 10 took 0.00s)
+[12:03:27] [VALIDATE] chunk_000: Writing unit 50/100 (Last 10 took 0.00s)
+[12:03:27] [VALIDATE] chunk_000: Writing unit 60/100 (Last 10 took 0.00s)
+[12:03:27] [VALIDATE] chunk_000: Writing unit 70/100 (Last 10 took 0.00s)
+[12:03:27] [VALIDATE] chunk_000: Writing unit 80/100 (Last 10 took 0.00s)
+[12:03:27] [VALIDATE] chunk_000: Writing unit 90/100 (Last 10 took 0.00s)
+[12:03:27] [VALIDATE] chunk_000: Writing unit 100/100 (Last 10 took 0.00s)
+[12:03:27] [VALIDATE] chunk_000/analyze: Validation complete: 100 valid, 0 failed
+[12:03:27] [VALIDATE] chunk_000: 100 valid, 0 failed
+[12:03:27] [STATE] chunk_000: analyze_SUBMITTED -> VALIDATED
+[12:03:27] [TICK] 1 collected, 0 submitted | idle | 1/1 chunks complete | $0.01 spent
+[12:03:27] [TICK] Tokens this tick: 29525 input, 13995 output | $0.0064
+[12:03:27] [POST-PROCESS] Running: Outcome Distribution...
+[12:03:27] [POST-PROCESS] Outcome Distribution: Output written to runs/it_20260325-113335_sailor_gemini_batch/outcome_distribution.txt
+[12:03:27] [POST-PROCESS] Outcome Distribution: Loading results from runs/it_20260325-113335_sailor_gemini_batch...
+[12:03:27] [POST-PROCESS] Outcome Distribution: Reading final step 'analyze' results...
+[12:03:27] [POST-PROCESS] Outcome Distribution: Loaded 100 results
+[12:03:27] [POST-PROCESS] Running: Steps by Scenario...
+[12:03:27] [POST-PROCESS] Steps by Scenario: Output written to runs/it_20260325-113335_sailor_gemini_batch/steps_by_scenario.txt
+[12:03:27] [POST-PROCESS] Steps by Scenario: Loading results from runs/it_20260325-113335_sailor_gemini_batch...
+[12:03:27] [POST-PROCESS] Steps by Scenario: Reading final step 'analyze' results...
+[12:03:27] [POST-PROCESS] Steps by Scenario: Loaded 100 results
+[12:03:27] [POST-PROCESS] Running: Steps by Outcome...
+[12:03:27] [POST-PROCESS] Steps by Outcome: Output written to runs/it_20260325-113335_sailor_gemini_batch/steps_by_outcome.txt
+[12:03:27] [POST-PROCESS] Steps by Outcome: Loading results from runs/it_20260325-113335_sailor_gemini_batch...
+[12:03:27] [POST-PROCESS] Steps by Outcome: Reading final step 'analyze' results...
+[12:03:27] [POST-PROCESS] Steps by Outcome: Loaded 100 results
+[12:03:27] [COMPLETE] Run completed successfully
+[11:57:47] Starting watch mode (interval=5s)
+[11:57:48] random_walk: 100/100 valid | analyze: 0/100 (pending)
+[11:57:48]   Delta: random_walk: +100 valid
+[11:57:56] random_walk: 100/100 valid | analyze: 0/100 (polling...)
+[11:58:01] random_walk: 100/100 valid | analyze: 0/100 (polling...)
+[11:58:06] random_walk: 100/100 valid | analyze: 0/100 (polling...)
+[11:58:12] random_walk: 100/100 valid | analyze: 0/100 (polling...)
+[11:58:18] random_walk: 100/100 valid | analyze: 0/100 (polling...)
+[11:58:24] random_walk: 100/100 valid | analyze: 0/100 (polling...)
+[11:58:30] random_walk: 100/100 valid | analyze: 0/100 (polling...)
+[11:58:35] random_walk: 100/100 valid | analyze: 0/100 (polling...)
+[11:58:41] random_walk: 100/100 valid | analyze: 0/100 (polling...)
+[11:58:47] random_walk: 100/100 valid | analyze: 0/100 (polling...)
+[11:58:52] random_walk: 100/100 valid | analyze: 0/100 (polling...)
+[11:58:58] random_walk: 100/100 valid | analyze: 0/100 (polling...)
+[11:59:04] random_walk: 100/100 valid | analyze: 0/100 (polling...)
+[11:59:09] random_walk: 100/100 valid | analyze: 0/100 (polling...)
+[11:59:15] random_walk: 100/100 valid | analyze: 0/100 (polling...)
+[11:59:21] random_walk: 100/100 valid | analyze: 0/100 (polling...)
+[11:59:27] random_walk: 100/100 valid | analyze: 0/100 (polling...)
+[11:59:33] random_walk: 100/100 valid | analyze: 0/100 (polling...)
+[11:59:38] random_walk: 100/100 valid | analyze: 0/100 (polling...)
+[11:59:44] random_walk: 100/100 valid | analyze: 0/100 (polling...)
+[11:59:50] random_walk: 100/100 valid | analyze: 0/100 (polling...)
+[11:59:55] random_walk: 100/100 valid | analyze: 0/100 (polling...)
+[12:00:01] random_walk: 100/100 valid | analyze: 0/100 (polling...)
+[12:00:06] random_walk: 100/100 valid | analyze: 0/100 (polling...)
+[12:00:12] random_walk: 100/100 valid | analyze: 0/100 (polling...)
+[12:00:17] random_walk: 100/100 valid | analyze: 0/100 (polling...)
+[12:00:22] random_walk: 100/100 valid | analyze: 0/100 (polling...)
+[12:00:28] random_walk: 100/100 valid | analyze: 0/100 (polling...)
+[12:00:33] random_walk: 100/100 valid | analyze: 0/100 (polling...)
+[12:00:38] random_walk: 100/100 valid | analyze: 0/100 (polling...)
+[12:00:44] random_walk: 100/100 valid | analyze: 0/100 (polling...)
+[12:00:49] random_walk: 100/100 valid | analyze: 0/100 (polling...)
+[12:00:54] random_walk: 100/100 valid | analyze: 0/100 (polling...)
+[12:01:00] random_walk: 100/100 valid | analyze: 0/100 (polling...)
+[12:01:05] random_walk: 100/100 valid | analyze: 0/100 (polling...)
+[12:01:10] random_walk: 100/100 valid | analyze: 0/100 (polling...)
+[12:01:16] random_walk: 100/100 valid | analyze: 0/100 (polling...)
+[12:01:21] random_walk: 100/100 valid | analyze: 0/100 (polling...)
+[12:01:27] random_walk: 100/100 valid | analyze: 0/100 (polling...)
+[12:01:32] random_walk: 100/100 valid | analyze: 0/100 (polling...)
+[12:01:37] random_walk: 100/100 valid | analyze: 0/100 (polling...)
+[12:01:43] random_walk: 100/100 valid | analyze: 0/100 (polling...)
+[12:01:48] random_walk: 100/100 valid | analyze: 0/100 (polling...)
+[12:01:53] random_walk: 100/100 valid | analyze: 0/100 (polling...)
+[12:01:59] random_walk: 100/100 valid | analyze: 0/100 (polling...)
+[12:02:04] random_walk: 100/100 valid | analyze: 0/100 (polling...)
+[12:02:10] random_walk: 100/100 valid | analyze: 0/100 (polling...)
+[12:02:15] random_walk: 100/100 valid | analyze: 0/100 (polling...)
+[12:02:20] random_walk: 100/100 valid | analyze: 0/100 (polling...)
+[12:02:26] random_walk: 100/100 valid | analyze: 0/100 (polling...)
+[12:02:31] random_walk: 100/100 valid | analyze: 0/100 (polling...)
+[12:02:37] random_walk: 100/100 valid | analyze: 0/100 (polling...)
+[12:02:42] random_walk: 100/100 valid | analyze: 0/100 (polling...)
+[12:02:47] random_walk: 100/100 valid | analyze: 0/100 (polling...)
+[12:02:53] random_walk: 100/100 valid | analyze: 0/100 (polling...)
+[12:02:58] random_walk: 100/100 valid | analyze: 0/100 (polling...)
+[12:03:04] random_walk: 100/100 valid | analyze: 0/100 (polling...)
+[12:03:09] random_walk: 100/100 valid | analyze: 0/100 (polling...)
+[12:03:15] random_walk: 100/100 valid | analyze: 0/100 (polling...)
+[12:03:20] random_walk: 100/100 valid | analyze: 0/100 (polling...)
+[12:03:27] random_walk: 100/100 valid | analyze: 100/100 valid
+[12:03:27]   Delta: analyze: +100 valid
+[12:03:27] Pipeline complete: 100 valid
+[12:03:27] Total: 43,520 tokens (29,525 in + 13,995 out) | $0.0064

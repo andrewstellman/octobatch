@@ -1,0 +1,120 @@
+[11:53:25] [INIT] Starting new run
+[11:53:25] [INIT] Command: ./scripts/orchestrate.py --init --pipeline DrunkenSailor --run-dir ./runs/it_20260325-113335_sailor_anthropic_rt --realtime --provider anthropic --max-units 15 --yes
+[11:53:25] [INIT] Config: /Users/andrewstellman/Documents/Game/octobatch-awesome-copilot/pipelines/DrunkenSailor/config.yaml
+[11:53:25] [INIT] Provider override: anthropic
+[11:53:25] [INIT] Applied overrides: provider=anthropic, model=None
+[11:53:25] [INIT] Copied item source: items.yaml
+[11:53:25] [INIT] Copied templates directory: templates
+[11:53:25] [INIT] Copied schemas directory: schemas
+[11:53:25] [INIT] Config snapshot saved to run directory
+[11:53:25] [INIT] Generated 15 units (1 base × 100 repetitions, limited from 100)
+[11:53:25] [INIT] Created 1 chunks (chunk_size=100)
+[11:53:25] [INIT] Pipeline: random_walk -> analyze
+[11:53:25] [INIT] Run initialized successfully
+[11:53:25] [REALTIME] Anthropic API key: AVAILABLE
+[11:53:25] [REALTIME] Starting real-time execution
+[11:53:26] [REALTIME] Running random_walk with anthropic/claude-sonnet-4-20250514 (default)
+Run initialized: runs/it_20260325-113335_sailor_anthropic_rt
+  Units: 15
+  Chunks: 1
+  Pipeline: random_walk -> analyze
+[11:53:25] Real-time mode (2x cost)
+[11:53:26] Running random_walk with anthropic/claude-sonnet-4-20250514 (default)
+[11:53:26] Running random_walk (15 units)...
+[11:53:26] [1/15] start_at_5__rep0000 ✓
+[11:53:26] [2/15] start_at_5__rep0001 ✓
+[11:53:26] [3/15] start_at_5__rep0002 ✓
+[11:53:26] [4/15] start_at_5__rep0003 ✓
+[11:53:26] [5/15] start_at_5__rep0004 ✓
+[11:53:26] [6/15] start_at_5__rep0005 ✓
+[11:53:26] [7/15] start_at_5__rep0006 ✓
+[11:53:26] [8/15] start_at_5__rep0007 ✓
+[11:53:26] [9/15] start_at_5__rep0008 ✓
+[11:53:26] [10/15] start_at_5__rep0009 ✓
+[11:53:26] [11/15] start_at_5__rep0010 ✓
+[11:53:26] [12/15] start_at_5__rep0011 ✓
+[11:53:26] [13/15] start_at_5__rep0012 ✓
+[11:53:26] [14/15] start_at_5__rep0013 ✓
+[11:53:26] [15/15] start_at_5__rep0014 ✓
+[11:53:26] [REALTIME] Running analyze with anthropic/claude-sonnet-4-20250514 (default)
+[11:53:39] [REALTIME_ERROR] start_at_5__rep0000: Anthropic API error: Error code: 529 - {'type': 'error', 'error': {'type': 'overloaded_error', 'message': 'Overloaded'}, 'request_id': 'req_011CZQ4uyqGEhsX6q5xBSnCe'}
+[11:53:26] random_walk: 15/15 valid (0.1s) | 0 tokens | $0.0000
+[11:53:26] Running analyze with anthropic/claude-sonnet-4-20250514 (default)
+[11:53:26] Running analyze (15 units)...
+[11:53:39] [1/15] start_at_5__rep0000 ✗ (API error)
+         └─ Error: Anthropic API error: Error code: 529 - {'type': 'error', 'error': {'type': 'overloaded_error', 'message': 'Overloaded'}, 'request_id': 'req_011CZQ4uyqGEhsX6q5xBSnCe'}
+[11:53:54] [2/15] start_at_5__rep0001 ✓ | 344 tokens | $0.0021 | ~3m 1s left
+[11:53:57] [3/15] start_at_5__rep0002 ✗ (API error) | 344 tokens | $0.0021 | ~2m 5s left
+[11:54:04] [4/15] start_at_5__rep0003 ✗ (API error) | 344 tokens | $0.0021 | ~1m 44s left
+[11:54:07] [5/15] start_at_5__rep0004 ✗ (API error) | 344 tokens | $0.0021 | ~1m 22s left
+[11:54:10] [6/15] start_at_5__rep0005 ✗ (API error) | 344 tokens | $0.0021 | ~1m 7s left
+[11:54:15] [7/15] start_at_5__rep0006 ✓ | 698 tokens | $0.0042 | ~56s left
+[11:54:19] [8/15] start_at_5__rep0007 ✗ (API error) | 698 tokens | $0.0042 | ~46s left
+[11:54:26] [9/15] start_at_5__rep0008 ✓ | 1,484 tokens | $0.0103 | ~40s left
+[11:54:29] [10/15] start_at_5__rep0009 ✗ (API error) | 1,484 tokens | $0.0103 | ~31s left
+[11:54:37] [11/15] start_at_5__rep0010 ✓ | 2,056 tokens | $0.0144 | ~26s left
+[11:54:42] [12/15] start_at_5__rep0011 ✗ (API error) | 2,056 tokens | $0.0144 | ~18s left
+[11:54:46] [13/15] start_at_5__rep0012 ✓ | 2,386 tokens | $0.0163 | ~12s left
+[11:54:55] [14/15] start_at_5__rep0013 ✓ | 2,802 tokens | $0.0191 | ~6s left
+[11:55:07] [15/15] start_at_5__rep0014 ✓ | 3,492 tokens | $0.0242
+[11:55:07] [VALIDATE] chunk_000/analyze: Starting validation of 15 units (timeout=600s)
+[11:55:07] [VALIDATE] chunk_000/analyze: Running schema validation...
+[11:55:08] [VALIDATE] chunk_000/analyze: Schema validation complete: 7 passed, 8 failed (0.2s)
+[11:55:08] [VALIDATE] chunk_000/analyze: Running business logic validation on 7 records (599s remaining)...
+[11:55:08] [VALIDATE] chunk_000/analyze: Subprocess pipeline complete (0.3s)
+[11:55:08] [VALIDATE] chunk_000/analyze: Validation complete: 7 valid, 8 failed
+[11:55:51] [VALIDATE] retry/analyze: Starting validation of 8 units (timeout=600s)
+[11:55:51] [VALIDATE] retry/analyze: Running schema validation...
+[11:55:51] [VALIDATE] retry/analyze: Schema validation complete: 2 passed, 6 failed (0.2s)
+[11:55:51] [VALIDATE] retry/analyze: Running business logic validation on 2 records (599s remaining)...
+[11:55:51] [VALIDATE] retry/analyze: Subprocess pipeline complete (0.2s)
+[11:55:51] [VALIDATE] retry/analyze: Validation complete: 2 valid, 6 failed
+[11:55:08] analyze: 7/15 valid (102.0s) | 3,492 tokens | $0.0242
+[11:55:51] analyze retry 1/5: 2/8 valid | 1,310 tokens | $0.0097
+[11:56:25] [VALIDATE] retry/analyze: Starting validation of 6 units (timeout=600s)
+[11:56:25] [VALIDATE] retry/analyze: Running schema validation...
+[11:56:25] [VALIDATE] retry/analyze: Schema validation complete: 3 passed, 3 failed (0.2s)
+[11:56:25] [VALIDATE] retry/analyze: Running business logic validation on 3 records (599s remaining)...
+[11:56:25] [VALIDATE] retry/analyze: Subprocess pipeline complete (0.3s)
+[11:56:25] [VALIDATE] retry/analyze: Validation complete: 3 valid, 3 failed
+[11:56:25] analyze retry 2/5: 3/6 valid | 1,278 tokens | $0.0084
+[11:56:51] [VALIDATE] retry/analyze: Starting validation of 3 units (timeout=600s)
+[11:56:51] [VALIDATE] retry/analyze: Running schema validation...
+[11:56:51] [VALIDATE] retry/analyze: Schema validation complete: 2 passed, 1 failed (0.2s)
+[11:56:51] [VALIDATE] retry/analyze: Running business logic validation on 2 records (599s remaining)...
+[11:56:51] [VALIDATE] retry/analyze: Subprocess pipeline complete (0.3s)
+[11:56:51] [VALIDATE] retry/analyze: Validation complete: 2 valid, 1 failed
+[11:56:51] analyze retry 3/5: 2/3 valid | 856 tokens | $0.0057
+[11:56:59] [VALIDATE] retry/analyze: Starting validation of 1 units (timeout=600s)
+[11:56:59] [VALIDATE] retry/analyze: Running schema validation...
+[11:56:59] [VALIDATE] retry/analyze: Schema validation complete: 0 passed, 1 failed (0.1s)
+[11:56:59] [VALIDATE] retry/analyze: Running business logic validation on 0 records (599s remaining)...
+[11:56:59] [VALIDATE] retry/analyze: Subprocess pipeline complete (0.2s)
+[11:56:59] [VALIDATE] retry/analyze: Validation complete: 0 valid, 1 failed
+[11:56:59] analyze retry 4/5: 0/1 valid | 0 tokens | $0.0000
+[11:57:05] [VALIDATE] retry/analyze: Starting validation of 1 units (timeout=600s)
+[11:57:05] [VALIDATE] retry/analyze: Running schema validation...
+[11:57:05] [VALIDATE] retry/analyze: Schema validation complete: 1 passed, 0 failed (0.2s)
+[11:57:05] [VALIDATE] retry/analyze: Running business logic validation on 1 records (599s remaining)...
+[11:57:06] [VALIDATE] retry/analyze: Subprocess pipeline complete (0.3s)
+[11:57:06] [VALIDATE] retry/analyze: Validation complete: 1 valid, 0 failed
+[11:57:06] analyze retry 5/5: 1/1 valid | 510 tokens | $0.0036
+[11:57:06] [POST-PROCESS] Running: Outcome Distribution...
+[11:57:06] [POST-PROCESS] Outcome Distribution: Output written to runs/it_20260325-113335_sailor_anthropic_rt/outcome_distribution.txt
+[11:57:06] [POST-PROCESS] Outcome Distribution: Loading results from runs/it_20260325-113335_sailor_anthropic_rt...
+[11:57:06] [POST-PROCESS] Outcome Distribution: Reading final step 'analyze' results...
+[11:57:06] [POST-PROCESS] Outcome Distribution: Loaded 15 results
+[11:57:06] [POST-PROCESS] Running: Steps by Scenario...
+[11:57:06] [POST-PROCESS] Steps by Scenario: Output written to runs/it_20260325-113335_sailor_anthropic_rt/steps_by_scenario.txt
+[11:57:06] [POST-PROCESS] Steps by Scenario: Loading results from runs/it_20260325-113335_sailor_anthropic_rt...
+[11:57:06] [POST-PROCESS] Steps by Scenario: Reading final step 'analyze' results...
+[11:57:06] [POST-PROCESS] Steps by Scenario: Loaded 15 results
+[11:57:06] [POST-PROCESS] Running: Steps by Outcome...
+[11:57:06] [POST-PROCESS] Steps by Outcome: Output written to runs/it_20260325-113335_sailor_anthropic_rt/steps_by_outcome.txt
+[11:57:06] [POST-PROCESS] Steps by Outcome: Loading results from runs/it_20260325-113335_sailor_anthropic_rt...
+[11:57:06] [POST-PROCESS] Steps by Outcome: Reading final step 'analyze' results...
+[11:57:06] [POST-PROCESS] Steps by Outcome: Loaded 15 results
+[11:57:06] [REALTIME] Complete: 30 valid, 8 retried, 0 failed, cost=$0.0516
+[11:57:06] [COMPLETE] Run completed successfully
+[11:57:06] Pipeline complete: 30 valid, 8 retried, 0 failed
+[11:57:06] Total: 7,446 tokens (5,007 in + 2,439 out) | $0.0516

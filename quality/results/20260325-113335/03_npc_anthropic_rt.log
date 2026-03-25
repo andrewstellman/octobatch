@@ -1,0 +1,85 @@
+[11:34:05] [INIT] Starting new run
+[11:34:05] [INIT] Command: ./scripts/orchestrate.py --init --pipeline NPCDialog --run-dir ./runs/it_20260325-113335_npc_anthropic_rt --realtime --provider anthropic --max-units 12 --yes
+[11:34:05] [INIT] Config: /Users/andrewstellman/Documents/Game/octobatch-awesome-copilot/pipelines/NPCDialog/config.yaml
+[11:34:05] [INIT] Provider override: anthropic
+[11:34:05] [INIT] Applied overrides: provider=anthropic, model=None
+[11:34:05] [INIT] Copied item source: items.yaml
+[11:34:05] [INIT] Copied templates directory: templates
+[11:34:05] [INIT] Copied schemas directory: schemas
+[11:34:05] [INIT] Config snapshot saved to run directory
+[11:34:05] [INIT] Generated 12 units (cross_product: 3 groups)
+[11:34:05] [INIT] Created 1 chunks (chunk_size=60)
+[11:34:05] [INIT] Pipeline: generate_dialog -> score_consistency
+[11:34:05] [INIT] Run initialized successfully
+[11:34:05] [REALTIME] Anthropic API key: AVAILABLE
+[11:34:06] [REALTIME] Starting real-time execution
+[11:34:06] [REALTIME] Running generate_dialog with anthropic/claude-sonnet-4-20250514 (default)
+[11:34:14] [REALTIME_ERROR] gruff_blacksmith-friendly-directions: Anthropic API error: Error code: 529 - {'type': 'error', 'error': {'type': 'overloaded_error', 'message': 'Overloaded'}, 'request_id': 'req_011CZQ3RxhQgkmR2rKExYFGj'}
+Run initialized: runs/it_20260325-113335_npc_anthropic_rt
+  Units: 12
+  Chunks: 1
+  Pipeline: generate_dialog -> score_consistency
+[11:34:06] Real-time mode (2x cost)
+[11:34:06] Running generate_dialog with anthropic/claude-sonnet-4-20250514 (default)
+[11:34:06] Running generate_dialog (12 units)...
+[11:34:14] [1/12] gruff_blacksmith-friendly-directions ✗ (API error)
+         └─ Error: Anthropic API error: Error code: 529 - {'type': 'error', 'error': {'type': 'overloaded_error', 'message': 'Overloaded'}, 'request_id': 'req_011CZQ3RxhQgkmR2rKExYFGj'}
+[11:34:18] [2/12] gruff_blacksmith-friendly-bartering ✗ (API error)
+[11:34:24] [3/12] gruff_blacksmith-friendly-quest_info ✗ (API error)
+[11:34:27] [4/12] gruff_blacksmith-aggressive-directions ✗ (API error)
+[11:34:36] [5/12] gruff_blacksmith-aggressive-bartering ✗ (API error)
+[11:34:42] [6/12] gruff_blacksmith-aggressive-quest_info ✗ (API error)
+[11:34:50] [7/12] gruff_blacksmith-desperate-directions ✗ (API error)
+[11:35:04] [8/12] gruff_blacksmith-desperate-bartering ✗ (API error)
+[11:35:10] [9/12] gruff_blacksmith-desperate-quest_info ✗ (API error)
+[11:35:18] [10/12] gruff_blacksmith-suspicious-directions ✗ (API error)
+[11:35:30] [11/12] gruff_blacksmith-suspicious-bartering ✗ (API error)
+[11:35:41] [12/12] gruff_blacksmith-suspicious-quest_info ✗ (API error)
+[11:35:41] [VALIDATE] chunk_000/generate_dialog: Starting validation of 12 units (timeout=600s)
+[11:35:41] [VALIDATE] chunk_000/generate_dialog: Running schema validation...
+[11:35:41] [VALIDATE] chunk_000/generate_dialog: Schema validation complete: 0 passed, 12 failed (0.1s)
+[11:35:41] [VALIDATE] chunk_000/generate_dialog: Running business logic validation on 0 records (599s remaining)...
+[11:35:41] [VALIDATE] chunk_000/generate_dialog: Subprocess pipeline complete (0.2s)
+[11:35:41] [VALIDATE] chunk_000/generate_dialog: Validation complete: 0 valid, 12 failed
+[11:35:41] [STOP] chunk_000: Step generate_dialog produced 0 valid units out of 12. Marking chunk as FAILED.
+[11:37:01] [VALIDATE] retry/generate_dialog: Starting validation of 12 units (timeout=600s)
+[11:37:01] [VALIDATE] retry/generate_dialog: Running schema validation...
+[11:37:01] [VALIDATE] retry/generate_dialog: Schema validation complete: 0 passed, 12 failed (0.2s)
+[11:37:01] [VALIDATE] retry/generate_dialog: Running business logic validation on 0 records (599s remaining)...
+[11:37:01] [VALIDATE] retry/generate_dialog: Subprocess pipeline complete (0.3s)
+[11:37:01] [VALIDATE] retry/generate_dialog: Validation complete: 0 valid, 12 failed
+[11:35:41] generate_dialog: 0/12 valid (95.0s) | 0 tokens | $0.0000
+[11:37:01] generate_dialog retry 1/5: 0/12 valid | 0 tokens | $0.0000
+[11:38:38] [VALIDATE] retry/generate_dialog: Starting validation of 12 units (timeout=600s)
+[11:38:38] [VALIDATE] retry/generate_dialog: Running schema validation...
+[11:38:39] [VALIDATE] retry/generate_dialog: Schema validation complete: 1 passed, 11 failed (0.2s)
+[11:38:39] [VALIDATE] retry/generate_dialog: Running business logic validation on 1 records (599s remaining)...
+[11:38:39] [VALIDATE] retry/generate_dialog: Subprocess pipeline complete (0.2s)
+[11:38:39] [VALIDATE] retry/generate_dialog: Validation complete: 1 valid, 11 failed
+[11:38:39] generate_dialog retry 2/5: 1/12 valid | 649 tokens | $0.0053
+[11:40:10] [VALIDATE] retry/generate_dialog: Starting validation of 11 units (timeout=600s)
+[11:40:10] [VALIDATE] retry/generate_dialog: Running schema validation...
+[11:40:10] [VALIDATE] retry/generate_dialog: Schema validation complete: 2 passed, 9 failed (0.2s)
+[11:40:10] [VALIDATE] retry/generate_dialog: Running business logic validation on 2 records (599s remaining)...
+[11:40:10] [VALIDATE] retry/generate_dialog: Subprocess pipeline complete (0.3s)
+[11:40:10] [VALIDATE] retry/generate_dialog: Validation complete: 2 valid, 9 failed
+[11:40:10] generate_dialog retry 3/5: 2/11 valid | 1,393 tokens | $0.0116
+[11:41:40] [VALIDATE] retry/generate_dialog: Starting validation of 9 units (timeout=600s)
+[11:41:40] [VALIDATE] retry/generate_dialog: Running schema validation...
+[11:41:40] [VALIDATE] retry/generate_dialog: Schema validation complete: 2 passed, 7 failed (0.2s)
+[11:41:40] [VALIDATE] retry/generate_dialog: Running business logic validation on 2 records (599s remaining)...
+[11:41:40] [VALIDATE] retry/generate_dialog: Subprocess pipeline complete (0.2s)
+[11:41:40] [VALIDATE] retry/generate_dialog: Validation complete: 2 valid, 7 failed
+[11:41:40] generate_dialog retry 4/5: 2/9 valid | 1,299 tokens | $0.0103
+[11:42:47] [VALIDATE] retry/generate_dialog: Starting validation of 7 units (timeout=600s)
+[11:42:47] [VALIDATE] retry/generate_dialog: Running schema validation...
+[11:42:47] [VALIDATE] retry/generate_dialog: Schema validation complete: 2 passed, 5 failed (0.2s)
+[11:42:47] [VALIDATE] retry/generate_dialog: Running business logic validation on 2 records (599s remaining)...
+[11:42:47] [VALIDATE] retry/generate_dialog: Subprocess pipeline complete (0.3s)
+[11:42:47] [VALIDATE] retry/generate_dialog: Validation complete: 2 valid, 5 failed
+[11:42:47] generate_dialog retry 5/5: 2/7 valid | 1,332 tokens | $0.0110
+[11:42:47] [REALTIME] Convergence pass 2
+[11:42:47] [REALTIME] Complete: 7 valid, 7 retried, 5 failed, cost=$0.0382
+[11:42:47] Convergence pass 2: re-scanning pipeline for advanced chunks...
+[11:42:47] Pipeline complete: 7 valid, 7 retried, 5 failed
+[11:42:47] Total: 4,673 tokens (2,661 in + 2,012 out) | $0.0382

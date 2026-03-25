@@ -1,5 +1,6 @@
 import json
 import math
+import random
 import sys
 from pathlib import Path
 
@@ -9,7 +10,10 @@ import yaml
 # Match the project's existing import pattern for script modules.
 sys.path.insert(0, str(Path(__file__).parent.parent / "scripts"))
 
+import orchestrate as orchestrate_module
 import providers as provider_module
+import realtime_provider as realtime_provider_module
+import scripts.providers as packaged_provider_module
 from config_validator import get_item_source_path, validate_config, validate_config_run
 from expression_evaluator import evaluate_expressions
 from generate_units import (
@@ -20,7 +24,15 @@ from generate_units import (
     get_positions,
 )
 from octobatch_utils import load_manifest, save_manifest
-from orchestrate import retry_validation_failures
+from orchestrate import (
+    check_prerequisites,
+    mark_failed_chunks_without_retryable_failures_terminal,
+    retry_validation_failures,
+    run_expression_step,
+    run_realtime_retries,
+)
+from realtime_provider import FatalProviderError, run_realtime
+from scripts.providers.base import AuthenticationError
 from schema_validator import (
     _coerce_value,
     _resolve_schema_node,
@@ -582,3 +594,219 @@ class TestBoundariesAndEdgeCases:
 
         assert unwrapped["status"] == "warm"
         assert unwrapped["response"].startswith("```")
+
+    def test_boundary_check_prerequisites_respects_cli_provider_override(self, monkeypatch):
+        """[Req: formal — specs/PROVIDERS.md § Provider/Model Resolution] prerequisite checks should only require the effective overridden provider."""
+        config = {
+            "api": {"provider": "gemini"},
+            "pipeline": {"steps": [{"name": "generate", "provider": "openai"}]},
+        }
+        manifest = {"metadata": {"cli_provider_override": True}}
+
+        monkeypatch.delenv("GOOGLE_API_KEY", raising=False)
+        monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+        monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+        monkeypatch.setenv("GOOGLE_API_KEY", "test-google-key")
+
+        assert check_prerequisites(config, manifest) is None
+
+    def test_boundary_terminalization_guard_marks_hard_failures_terminal(self, tmp_path):
+        """[Req: inferred — from orchestrate.watch_run() retry guard] chunks with only hard failures should be marked exhausted."""
+        run_dir = tmp_path / "run"
+        chunk_dir = run_dir / "chunks" / "chunk_000"
+        chunk_dir.mkdir(parents=True)
+        (chunk_dir / "generate_failures.jsonl").write_text(
+            json.dumps({"unit_id": "u1", "failure_stage": "pipeline_internal", "retry_count": 0}) + "\n"
+        )
+
+        manifest = {
+            "chunks": {"chunk_000": {"state": "FAILED", "retries": 0}},
+        }
+
+        patched = mark_failed_chunks_without_retryable_failures_terminal(
+            run_dir,
+            manifest,
+            ["generate"],
+            run_dir / "RUN_LOG.txt",
+            max_retries=3,
+        )
+
+        assert patched is True
+        assert manifest["chunks"]["chunk_000"]["retries"] == 3
+
+    def test_boundary_run_realtime_retries_skips_pipeline_internal_failures(self, tmp_path):
+        """[Req: formal — specs/VALIDATION.md § Retry Routing] realtime retries should skip hard pipeline failures."""
+        run_dir = tmp_path / "run"
+        chunk_dir = run_dir / "chunks" / "chunk_000"
+        chunk_dir.mkdir(parents=True)
+        (chunk_dir / "units.jsonl").write_text(json.dumps({"unit_id": "u1", "payload": "keep"}) + "\n")
+        (chunk_dir / "generate_failures.jsonl").write_text(
+            json.dumps({"unit_id": "u1", "failure_stage": "pipeline_internal", "retry_count": 0}) + "\n"
+        )
+
+        config = {
+            "pipeline": {"steps": [{"name": "generate"}]},
+            "api": {"retry": {"max_attempts": 1}},
+        }
+        manifest = {
+            "config": "config/config.yaml",
+            "pipeline": ["generate"],
+            "chunks": {"chunk_000": {"state": "FAILED"}},
+        }
+
+        result = run_realtime_retries(run_dir, "generate", config, manifest, run_dir / "RUN_LOG.txt", max_retries=3)
+
+        assert result == (0, 0, 0, 0)
+        assert not (run_dir / ".retry_generate_units.jsonl").exists()
+
+    def test_boundary_run_realtime_retries_counts_all_remaining_failures(self, tmp_path, monkeypatch):
+        """[Req: inferred — from orchestrate.run_realtime_retries() merge behavior] hard failures preserved during retry merge must still count as failed."""
+        run_dir = tmp_path / "run"
+        chunk_dir = run_dir / "chunks" / "chunk_000"
+        chunk_dir.mkdir(parents=True)
+        log_file = run_dir / "RUN_LOG.txt"
+
+        (chunk_dir / "units.jsonl").write_text(
+            "\n".join(
+                [
+                    json.dumps({"unit_id": "u1", "payload": "retryable"}),
+                    json.dumps({"unit_id": "u2", "payload": "hard-failure"}),
+                ]
+            )
+            + "\n"
+        )
+        (chunk_dir / "generate_failures.jsonl").write_text(
+            "\n".join(
+                [
+                    json.dumps({"unit_id": "u1", "failure_stage": "validation", "retry_count": 0}),
+                    json.dumps({"unit_id": "u2", "failure_stage": "pipeline_internal", "retry_count": 0}),
+                ]
+            )
+            + "\n"
+        )
+
+        config = {
+            "pipeline": {"steps": [{"name": "generate"}]},
+            "api": {"retry": {"max_attempts": 1, "initial_delay_seconds": 0.0, "backoff_multiplier": 1}},
+        }
+        manifest = {
+            "config": "config/config.yaml",
+            "pipeline": ["generate"],
+            "chunks": {"chunk_000": {"state": "FAILED", "valid": 0, "failed": 2}},
+        }
+
+        def fake_prepare_prompts(units_file, prompts_file, config_path, step, timeout=None):
+            units = [json.loads(line) for line in units_file.read_text().splitlines() if line.strip()]
+            prompts_file.write_text(
+                "\n".join(json.dumps({"unit_id": unit["unit_id"], "prompt": "retry"}) for unit in units) + "\n"
+            )
+            return True, None
+
+        def fake_run_validation_pipeline(results_file, validated_file, failures_file, *args, **kwargs):
+            results = [json.loads(line) for line in results_file.read_text().splitlines() if line.strip()]
+            validated_file.write_text("\n".join(json.dumps(item) for item in results) + ("\n" if results else ""))
+            failures_file.write_text("")
+            return (len(results), 0)
+
+        class DummyProvider:
+            model = "dummy-model"
+
+        monkeypatch.setattr(orchestrate_module, "prepare_prompts", fake_prepare_prompts)
+        monkeypatch.setattr(orchestrate_module, "run_validation_pipeline", fake_run_validation_pipeline)
+        monkeypatch.setattr(packaged_provider_module, "get_step_provider", lambda config, step, manifest: DummyProvider())
+        monkeypatch.setattr(
+            realtime_provider_module,
+            "run_realtime",
+            lambda prompts, provider, **kwargs: [
+                {"unit_id": prompt["unit_id"], "result": "ok", "_metadata": {"input_tokens": 0, "output_tokens": 0}}
+                for prompt in prompts
+            ],
+        )
+
+        retried, still_failed, input_tokens, output_tokens = run_realtime_retries(
+            run_dir,
+            "generate",
+            config,
+            manifest,
+            log_file,
+            max_retries=3,
+        )
+
+        remaining_failures = [
+            json.loads(line)
+            for line in (chunk_dir / "generate_failures.jsonl").read_text().splitlines()
+            if line.strip()
+        ]
+
+        assert retried == 1
+        assert still_failed == 0
+        assert input_tokens == 0
+        assert output_tokens == 0
+        assert remaining_failures == [{"unit_id": "u2", "failure_stage": "pipeline_internal", "retry_count": 0}]
+        assert manifest["chunks"]["chunk_000"]["valid"] == 1
+        assert manifest["chunks"]["chunk_000"]["failed"] == 1
+
+    def test_boundary_loop_until_random_condition_uses_seeded_rng(self, tmp_path):
+        """[Req: formal — specs/EXPRESSION.md § Seeded Randomness] loop_until conditions that use random stay deterministic for a fixed seed."""
+        run_dir = tmp_path / "run"
+        chunk_dir = run_dir / "chunks" / "chunk_000"
+        chunk_dir.mkdir(parents=True)
+        (chunk_dir / "units.jsonl").write_text(json.dumps({"unit_id": "u1", "_repetition_seed": 17}) + "\n")
+
+        step_config = {
+            "scope": "expression",
+            "expressions": {"draw": "random.random()"},
+            "loop_until": "random.random() > 0.7",
+            "max_iterations": 10,
+        }
+        config = {"pipeline": {"steps": [{"name": "simulate", "scope": "expression"}]}}
+        manifest = {"pipeline": ["simulate"], "chunks": {"chunk_000": {"state": "simulate_PENDING"}}}
+
+        first_output = chunk_dir / "first.jsonl"
+        second_output = chunk_dir / "second.jsonl"
+
+        random.seed(1)
+        first_result = run_expression_step(
+            run_dir,
+            "chunk_000",
+            "simulate",
+            step_config,
+            config,
+            manifest,
+            run_dir / "RUN_LOG.txt",
+            output_file=first_output,
+        )
+        random.seed(999)
+        second_result = run_expression_step(
+            run_dir,
+            "chunk_000",
+            "simulate",
+            step_config,
+            config,
+            manifest,
+            run_dir / "RUN_LOG.txt",
+            output_file=second_output,
+        )
+
+        first_payload = [json.loads(line) for line in first_output.read_text().splitlines() if line.strip()]
+        second_payload = [json.loads(line) for line in second_output.read_text().splitlines() if line.strip()]
+
+        assert first_result == (1, 0, 0, 0)
+        assert second_result == (1, 0, 0, 0)
+        assert first_payload == second_payload
+
+    def test_boundary_run_realtime_aborts_on_authentication_error(self):
+        """[Req: inferred — from realtime_provider.FatalProviderError] auth failures should abort the run immediately, even without HTTP codes in the message."""
+        class DummyProvider:
+            model = "dummy-model"
+
+            def generate_realtime(self, prompt_text):
+                raise AuthenticationError("Invalid API key")
+
+        with pytest.raises(FatalProviderError, match="Invalid API key"):
+            run_realtime(
+                [{"unit_id": "u1", "prompt": "hello"}],
+                DummyProvider(),
+                delay_between_calls=0,
+                max_retries=1,
+            )

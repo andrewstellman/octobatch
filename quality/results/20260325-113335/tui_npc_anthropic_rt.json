@@ -1,0 +1,30 @@
+{
+  "name": "it_20260325-113335_npc_anthropic_rt",
+  "status": "running",
+  "pipeline_name": "NPCDialog",
+  "provider": "anthropic",
+  "model": "claude-sonnet-4-20250514",
+  "mode": "realtime",
+  "total_units": 12,
+  "valid_units": 7,
+  "failed_units": 5,
+  "cost": 0.0,
+  "total_tokens": 4673,
+  "input_tokens": 2661,
+  "output_tokens": 2012,
+  "duration": "8m 42s",
+  "steps": [
+    {
+      "name": "generate_dialog",
+      "valid": 0,
+      "total": 12,
+      "state": "pending"
+    },
+    {
+      "name": "score_consistency",
+      "valid": 0,
+      "total": 12,
+      "state": "pending"
+    }
+  ]
+}

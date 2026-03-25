@@ -94,9 +94,9 @@ The following do **not** count as meaningful quality work in Octobatch:
 
 **Requirement tag:** [Req: inferred — from `orchestrate.retry_validation_failures()` behavior]
 
-**What happened:** Retrying an entire chunk because one or two units failed replays successful work, increases spend, and can create duplicate or contradictory artifacts. The retry-isolation logic exists precisely because unit-level retries are safer than chunk resets when a 100-unit chunk contains 98 good records and 2 bad ones.
+**What happened:** Retrying an entire chunk because one or two units failed replays successful work, increases spend, and can create duplicate or contradictory artifacts. The retry-isolation logic exists precisely because unit-level retries are safer than chunk resets when a 100-unit chunk contains 98 good records and 2 bad ones. This scenario is about isolation within a single invocation: retryable validation failures must be separated from hard failures during that run, even though a later `--realtime` invocation intentionally starts with a fresh retry budget.
 
-**The requirement:** `retry_validation_failures()` must create retry chunks only for retryable validation failures, archive the original failure file to `.bak`, and leave hard failures plus successful units in place.
+**The requirement:** `retry_validation_failures()` must create retry chunks only for retryable validation failures, archive the original failure file to `.bak`, and leave hard failures plus successful units in place. Within an invocation, the terminalization logic must treat chunks with only hard failures as exhausted, not as retryable work.
 
 **How to verify:** Run `test_scenario_6_retry_isolation_preserves_good_work` in `quality/test_functional.py`.
 

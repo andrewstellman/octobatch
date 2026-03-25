@@ -1,0 +1,21 @@
+{
+  "pipeline": "DrunkenSailor",
+  "final_step": "analyze",
+  "validated_count": 15,
+  "failure_count": 0,
+  "status": "complete",
+  "checks": {
+    "outcome_valid_enum": {
+      "pass": true,
+      "detail": "All 15 valid",
+      "invalid_samples": []
+    },
+    "outcome_balance": {
+      "pass": true,
+      "detail": "fell_in_water: 6/15 (40.0%)",
+      "ratio": 0.4
+    }
+  },
+  "cost": 0.002056,
+  "duration": "1m 1s"
+}
