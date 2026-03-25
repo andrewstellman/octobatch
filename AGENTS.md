@@ -34,6 +34,9 @@ pytest tests/
 # Run tests with coverage
 pytest tests/ --cov=scripts --cov-report=term-missing
 
+# Run the quality playbook functional tests
+pytest quality/test_functional.py -v
+
 # Validate a pipeline config without running it
 python3 scripts/orchestrate.py --validate-config --config pipelines/Blackjack/config.yaml
 
@@ -61,6 +64,22 @@ python3 scripts/tui.py
 ```
 
 All tests must pass before committing. Run `pytest tests/` to see the current test count. Coverage must not decrease — verify with `pytest tests/ --cov=scripts --cov-report=term-missing`. Core modules (config_validator, generate_units, octobatch_utils, run_tools, schema_validator) must stay above 80% coverage.
+
+## Quality docs
+
+The project quality playbook lives in `quality/`:
+
+- `quality/QUALITY.md` — quality constitution, coverage targets, and fitness-to-purpose scenarios
+- `quality/test_functional.py` — spec-traced functional safety-net tests
+- `quality/RUN_CODE_REVIEW.md` — guarded code review protocol
+- `quality/RUN_INTEGRATION_TESTS.md` — real-provider integration test protocol
+- `quality/RUN_SPEC_AUDIT.md` — Council of Three spec-audit protocol
+
+Output folders used by the protocols:
+
+- `quality/code_reviews/`
+- `quality/spec_audits/`
+- `quality/results/`
 
 ## Architecture
 
@@ -106,7 +125,7 @@ For deeper context, read these files in order:
 
 1. `ai_context/DEVELOPMENT_CONTEXT.md` — Session state, recent work, bootstrap instructions
 2. `ai_context/PROJECT_CONTEXT.md` — System architecture, design patterns, folder structure
-3. `ai_context/QUALITY.md` — Quality standards, coverage targets, fitness-to-purpose scenarios
+3. `quality/QUALITY.md` — Quality standards, coverage targets, fitness-to-purpose scenarios
 4. `scripts/CONTEXT.md` — Orchestrator internals
 5. `scripts/tui/CONTEXT.md` — TUI application structure
 6. `pipelines/TOOLKIT.md` — AI-facing reference for pipeline creation
