@@ -4273,6 +4273,19 @@ def _watch_loop(
         if interrupted_flag():
             return 130
 
+        # Check if run was auto-paused (e.g. by rate limit handler in tick_run)
+        _loop_manifest = load_manifest(run_dir)
+        _loop_status = _loop_manifest.get("status", "") if _loop_manifest else ""
+        if _loop_status in ("paused", "killed"):
+            now = datetime.now()
+            time_str = now.strftime("%H:%M:%S")
+            reason = _loop_manifest.get("metadata", {}).get("auto_paused_reason", "")
+            if reason:
+                print(f"[{time_str}] Run auto-paused: {reason}. Watcher exiting.")
+            else:
+                print(f"[{time_str}] Run status is '{_loop_status}'. Watcher exiting.")
+            return 0
+
         # Run a tick
         tick_count += 1
         status = tick_run(run_dir, max_retries=max_retries)

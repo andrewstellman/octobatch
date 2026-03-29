@@ -991,6 +991,50 @@ class TestBoundariesAndEdgeCases:
         assert schedule[-1] <= 300, "Backoff cap must not exceed 300s"
         assert orchestrate.RATE_LIMIT_MAX_CONSECUTIVE == 5, "Auto-pause after 5 consecutive 429s"
 
+    def test_bug5_watch_loop_checks_auto_pause(self):
+        """
+        [Req: formal — BUG-5 / Finding 1] The watch loop must check manifest
+        status at the top of each iteration and exit when auto-paused.
+        """
+        import inspect
+        source = inspect.getsource(orchestrate._watch_loop)
+        assert "auto_paused_reason" in source, (
+            "Finding 1: _watch_loop must detect auto_paused_reason in manifest"
+        )
+        # Verify it checks before tick_run, not after
+        auto_pause_pos = source.index("auto_paused_reason")
+        tick_run_pos = source.index("tick_run(")
+        assert auto_pause_pos < tick_run_pos, (
+            "Finding 1: auto-pause check must come BEFORE tick_run call"
+        )
+
+    def test_bug5_auto_pause_halts_watcher(self, tmp_path):
+        """
+        [Req: formal — BUG-5 / Finding 1] When manifest status is 'paused',
+        _watch_loop must return immediately without running tick_run.
+        """
+        run_dir = tmp_path / "run"
+        run_dir.mkdir()
+        (run_dir / "RUN_LOG.txt").write_text("")
+        manifest = {
+            "config": "config/config.yaml",
+            "status": "paused",
+            "pipeline": ["generate"],
+            "chunks": {"chunk_000": {"state": "generate_PENDING", "retries": 0}},
+            "metadata": {"mode": "batch", "auto_paused_reason": "rate_limited",
+                         "poll_interval": 10},
+        }
+        (run_dir / "MANIFEST.json").write_text(json.dumps(manifest))
+        # _watch_loop should detect paused status and return 0 immediately
+        result = orchestrate._watch_loop(
+            run_dir=run_dir, interval=10, max_cost=None,
+            timeout_seconds=5, max_retries=3,
+            interrupted_flag=lambda: False,
+        )
+        assert result == 0, (
+            f"_watch_loop must return 0 when manifest is paused, got {result}"
+        )
+
     def test_bug8_watch_loop_calls_mark_run_complete_on_terminal(self):
         """
         [Req: formal — BUG-8] The watch loop must call mark_run_complete()
