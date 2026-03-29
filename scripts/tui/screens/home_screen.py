@@ -1540,14 +1540,24 @@ class HomeScreen(Screen):
                 return
 
             if manifest_status == "pending":
-                # Pending run: prompt user for batch vs realtime mode
-                from .modals import ConfirmModal
+                # Pending run: prompt user for mode and provider/model
+                from .modals import PendingRunModal
+                # Read manifest metadata for defaults
+                try:
+                    _manifest = load_manifest(run_dir)
+                    _meta = _manifest.get("metadata", {}) if _manifest else {}
+                    _default_provider = _meta.get("provider")
+                    _default_model = _meta.get("model")
+                except Exception:
+                    _default_provider = None
+                    _default_model = None
                 self.app.push_screen(
-                    ConfirmModal(
-                        f"Start pending run '{run.get('name', '')}'?",
-                        "Yes = Batch mode, No = Realtime mode",
+                    PendingRunModal(
+                        run_name=run.get('name', ''),
+                        default_provider=_default_provider,
+                        default_model=_default_model,
                     ),
-                    callback=lambda confirmed: self._handle_pending_run_start(confirmed, run_dir),
+                    callback=lambda result: self._handle_pending_run_start(result, run_dir),
                 )
                 return
 
@@ -1558,9 +1568,48 @@ class HomeScreen(Screen):
 
         self.app.notify(f"Cannot resume run in state: {manifest_status}", severity="warning")
 
-    def _handle_pending_run_start(self, confirmed: bool, run_dir: Path) -> None:
-        """Handle the batch/realtime choice for starting a pending run."""
-        mode = "batch" if confirmed else "realtime"
+    def _handle_pending_run_start(self, result, run_dir: Path) -> None:
+        """Handle the pending run modal result.
+
+        Args:
+            result: None if cancelled, or dict with mode/provider/model.
+        """
+        if result is None:
+            return  # User cancelled (Escape or Cancel button)
+
+        mode = result.get("mode", "batch")
+        provider = result.get("provider")
+        model = result.get("model")
+
+        # Apply provider/model overrides to the run's snapshot config
+        if provider or model:
+            try:
+                import yaml
+                config_path = run_dir / "config" / "config.yaml"
+                if config_path.exists():
+                    with open(config_path) as f:
+                        config = yaml.safe_load(f)
+                    if "api" not in config:
+                        config["api"] = {}
+                    if provider:
+                        config["api"]["provider"] = provider
+                    if model:
+                        config["api"]["model"] = model
+                    with open(config_path, "w") as f:
+                        yaml.dump(config, f, default_flow_style=False, sort_keys=False)
+                # Also update manifest metadata
+                import json as _json
+                manifest = load_manifest(run_dir)
+                if manifest:
+                    if provider:
+                        manifest.setdefault("metadata", {})["provider"] = provider
+                    if model:
+                        manifest.setdefault("metadata", {})["model"] = model
+                    manifest_path = run_dir / "MANIFEST.json"
+                    manifest_path.write_text(_json.dumps(manifest, indent=2))
+            except Exception:
+                pass  # Best-effort override
+
         self._update_manifest_for_restart(run_dir)
         self._start_orchestrator(run_dir, mode)
 

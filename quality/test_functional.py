@@ -634,6 +634,25 @@ class TestFitnessScenarios:
             "BUG-3: home_screen.py must have a _handle_pending_run_start method"
         )
 
+    def test_scenario_12_pending_run_cancel_does_not_start(self):
+        """
+        [Req: formal — QUALITY.md Scenario 12 / BUG-3 / Finding 2]
+        _handle_pending_run_start(None) must cancel without starting a run.
+        Escape and Cancel button both produce None.
+        """
+        home_screen_path = Path(__file__).parent.parent / "scripts" / "tui" / "screens" / "home_screen.py"
+        if not home_screen_path.exists():
+            pytest.skip("home_screen.py not found")
+        source = home_screen_path.read_text()
+        # Must check for None (cancel) and return early
+        assert "if result is None" in source, (
+            "Finding 2: _handle_pending_run_start must check for None (cancel)"
+        )
+        # Must use PendingRunModal (not ConfirmModal) for three-way result
+        assert "PendingRunModal" in source, (
+            "Finding 2: Must use PendingRunModal for batch/realtime/cancel choice"
+        )
+
     def test_scenario_12_mark_run_running_allows_pending_to_running_transition(self, tmp_path):
         """
         [Req: formal — QUALITY.md Scenario 12 / BUG-3]
