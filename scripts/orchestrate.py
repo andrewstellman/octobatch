@@ -2716,8 +2716,6 @@ def tick_run(run_dir: Path, max_retries: int = 5, drain_submitted_only: bool = F
             pending += 1
             if drain_submitted_only:
                 continue
-            if _skip_submissions:
-                continue
 
             # Log provider/model once per step
             if step not in _logged_batch_steps:
@@ -2843,6 +2841,10 @@ def tick_run(run_dir: Path, max_retries: int = 5, drain_submitted_only: bool = F
                     errors += 1
 
                 continue  # Skip API batch submission for fan-out steps
+
+            # Rate limit backoff: skip API submissions but allow expression/fan-out above
+            if _skip_submissions:
+                continue
 
             if inflight >= max_inflight:
                 throttled_count += 1
