@@ -991,6 +991,22 @@ class TestBoundariesAndEdgeCases:
         assert schedule[-1] <= 300, "Backoff cap must not exceed 300s"
         assert orchestrate.RATE_LIMIT_MAX_CONSECUTIVE == 5, "Auto-pause after 5 consecutive 429s"
 
+    def test_bug8_watch_loop_calls_mark_run_complete_on_terminal(self):
+        """
+        [Req: formal — BUG-8] The watch loop must call mark_run_complete()
+        when all chunks reach terminal state, and must also call
+        mark_failed_chunks_without_retryable_failures_terminal() each tick
+        to patch stuck FAILED chunks.
+        """
+        import inspect
+        source = inspect.getsource(orchestrate._watch_loop)
+        assert "mark_run_complete" in source, (
+            "BUG-8: _watch_loop must call mark_run_complete() when run is terminal"
+        )
+        assert "mark_failed_chunks_without_retryable_failures_terminal" in source, (
+            "BUG-8: _watch_loop must patch stuck FAILED chunks each tick"
+        )
+
     def test_sigint_save_timeout_is_reasonable(self):
         """
         [Req: inferred — from SIGINT_SAVE_TIMEOUT = 5 constant]

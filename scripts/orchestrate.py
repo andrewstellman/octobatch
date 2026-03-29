@@ -4317,9 +4317,17 @@ def _watch_loop(
             return 3
 
         # Check if terminal
-        # Reload manifest to get updated state
+        # Reload manifest to get updated state and patch stuck chunks
         manifest = load_manifest(run_dir)
+        log_file = run_dir / "RUN_LOG.txt"
+        patched = mark_failed_chunks_without_retryable_failures_terminal(
+            run_dir, manifest, manifest.get("pipeline", []),
+            log_file, max_retries,
+        )
+        if patched:
+            save_manifest(run_dir, manifest)
         if is_run_terminal(manifest, max_retries):
+            mark_run_complete(run_dir)
             # Run post-processing scripts before printing completion message
             config_path = run_dir / manifest["config"]
             with open(config_path) as f:
