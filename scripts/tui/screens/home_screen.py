@@ -1535,8 +1535,20 @@ class HomeScreen(Screen):
                 self._retry_failed_units(run_dir, mode)
                 return
 
-            if manifest_status not in ('detached', 'paused', 'running', 'active', 'zombie', 'stuck'):
+            if manifest_status not in ('detached', 'paused', 'running', 'active', 'zombie', 'stuck', 'pending'):
                 self.app.notify(f"Cannot resume run with status '{manifest_status}'", severity="warning")
+                return
+
+            if manifest_status == "pending":
+                # Pending run: prompt user for batch vs realtime mode
+                from .modals import ConfirmModal
+                self.app.push_screen(
+                    ConfirmModal(
+                        f"Start pending run '{run.get('name', '')}'?",
+                        "Yes = Batch mode, No = Realtime mode",
+                    ),
+                    callback=lambda confirmed: self._handle_pending_run_start(confirmed, run_dir),
+                )
                 return
 
             self.app.notify(f"Restarting run '{run.get('name', '')}'...")
@@ -1545,6 +1557,12 @@ class HomeScreen(Screen):
             return
 
         self.app.notify(f"Cannot resume run in state: {manifest_status}", severity="warning")
+
+    def _handle_pending_run_start(self, confirmed: bool, run_dir: Path) -> None:
+        """Handle the batch/realtime choice for starting a pending run."""
+        mode = "batch" if confirmed else "realtime"
+        self._update_manifest_for_restart(run_dir)
+        self._start_orchestrator(run_dir, mode)
 
     def _start_orchestrator(self, run_dir: Path, mode: str) -> None:
         """Start an orchestrator process for the run."""

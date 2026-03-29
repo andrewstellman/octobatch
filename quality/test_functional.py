@@ -615,12 +615,30 @@ class TestFitnessScenarios:
             "BUG-2: 'stuck' must be in pause handler's allowed statuses"
         )
 
+    def test_scenario_12_tui_resume_handler_allows_pending_status(self):
+        """
+        [Req: formal — QUALITY.md Scenario 12 / BUG-3]
+        TUI resume handler must include "pending" in the allowed statuses so
+        newly initialized runs can be started via the R key.
+        """
+        home_screen_path = Path(__file__).parent.parent / "scripts" / "tui" / "screens" / "home_screen.py"
+        if not home_screen_path.exists():
+            pytest.skip("home_screen.py not found")
+        source = home_screen_path.read_text()
+        # The resume handler's status guard (Case 3) must include "pending"
+        assert "'pending'" in source, (
+            "BUG-3: 'pending' must appear in home_screen.py resume handler's allowed statuses"
+        )
+        # Also verify there's a handler for pending runs
+        assert "_handle_pending_run_start" in source, (
+            "BUG-3: home_screen.py must have a _handle_pending_run_start method"
+        )
+
     def test_scenario_12_mark_run_running_allows_pending_to_running_transition(self, tmp_path):
         """
         [Req: formal — QUALITY.md Scenario 12 / BUG-3]
         mark_run_running() should allow runs with non-terminal status to become "running".
         This covers the "pending" → "running" transition needed by the TUI resume handler.
-        BUG-3: TUI resume (R key) only works on paused/failed/zombie, not "pending".
         """
         run_dir = tmp_path / "run"
         run_dir.mkdir()
