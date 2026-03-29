@@ -1295,7 +1295,7 @@ class HomeScreen(Screen):
             return
 
         status = run.get("status", "")
-        if status not in ("running", "active"):
+        if status not in ("running", "active", "stuck"):
             self.notify(f"Cannot pause run with status '{status}'", severity="warning")
             return
 

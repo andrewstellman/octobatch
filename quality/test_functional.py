@@ -597,18 +597,22 @@ class TestFitnessScenarios:
         """
         [Req: formal — QUALITY.md Scenario 11 / BUG-2]
         "stuck" status must be treated equivalently to "running" for pause/kill
-        eligibility. This test documents the known bug: check home_screen.py
-        status guard includes "stuck" in allowed states.
-        BUG-2: Currently home_screen.py only allows pause/kill on "running".
+        eligibility. Verify home_screen.py pause status guard includes "stuck".
         """
-        # Verify the bug is documented: "stuck" is a real operational state
-        # that occurs during sustained 429 rate limiting
-        manageable_statuses = {"running", "stuck"}
-        # The current bug: TUI only allows "running"
-        # This test documents what SHOULD be true:
-        assert "stuck" in manageable_statuses, (
-            "BUG-2: 'stuck' status (sustained 429s) must allow pause/kill actions. "
-            "See home_screen.py status guard."
+        home_screen_path = Path(__file__).parent.parent / "scripts" / "tui" / "screens" / "home_screen.py"
+        if not home_screen_path.exists():
+            pytest.skip("home_screen.py not found")
+        source = home_screen_path.read_text()
+        # The pause handler's status guard must include "stuck"
+        assert '"stuck"' in source, (
+            "BUG-2: 'stuck' must appear in home_screen.py status guards"
+        )
+        # Verify "stuck" is in the pause guard specifically (near "Cannot pause")
+        import re
+        pause_guard = re.search(r'if status not in \(([^)]+)\):\s*\n\s*self\.notify\(f"Cannot pause', source)
+        assert pause_guard is not None, "Could not find pause status guard"
+        assert "stuck" in pause_guard.group(1), (
+            "BUG-2: 'stuck' must be in pause handler's allowed statuses"
         )
 
     def test_scenario_12_mark_run_running_allows_pending_to_running_transition(self, tmp_path):
