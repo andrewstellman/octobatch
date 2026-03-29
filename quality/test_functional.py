@@ -683,12 +683,7 @@ class TestFitnessScenarios:
         """
         [Req: formal — QUALITY.md Scenario 13 / BUG-4]
         format_step_provider_tag() must not crash when provider_instance is None.
-        BUG-4: get_provider() throws on missing API key, broad except leaves
-        realtime_provider = None. Then format_step_provider_tag(None) crashes with
-        AttributeError: 'NoneType' object has no attribute 'config'.
-
-        This test is xfail(strict=True) — it CONFIRMS the bug exists.
-        When BUG-4 is fixed, this test will xpass and should have xfail removed.
+        Returns "unknown" when provider_instance is None (e.g. missing API key).
         """
         config = minimal_config([{"name": "generate"}])
         result = format_step_provider_tag(config, "generate", None)
@@ -698,12 +693,7 @@ class TestFitnessScenarios:
         """
         [Req: formal — QUALITY.md Scenario 14 / BUG-6]
         TUI cost calculation must not fall back to hardcoded Flash pricing rates.
-        BUG-6: _calculate_cost_from_manifest() in main_screen.py uses hardcoded
-        output_rate=0.30 (Flash batch). Pricing is registry-driven from models.yaml,
-        so this fallback always triggers. $1,856 run appeared to cost ~$109.
-
-        This test is xfail(strict=True) — it CONFIRMS the bug exists.
-        When BUG-6 is fixed, this test will xpass and should have xfail removed.
+        Pricing is registry-driven from models.yaml via manifest provider+model.
         """
         main_screen_path = Path(__file__).parent.parent / "scripts" / "tui" / "screens" / "main_screen.py"
         if not main_screen_path.exists():
