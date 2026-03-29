@@ -1456,7 +1456,7 @@ class HomeScreen(Screen):
             self.app.push_screen(
                 ConfirmModal(
                     f"Run is active (PID {pid}). Restart?",
-                    "This will kill the current process and relaunch.",
+                    "This will stop the current orchestrator process and start a new one. All completed work is preserved — it will resume from where it left off.",
                 ),
                 callback=lambda confirmed: self._handle_restart_confirm(confirmed, run_dir, mode, pid),
             )
