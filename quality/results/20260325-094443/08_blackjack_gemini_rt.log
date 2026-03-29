@@ -1,0 +1,158 @@
+[09:52:36] [INIT] Starting new run
+[09:52:36] [INIT] Command: ./scripts/orchestrate.py --init --pipeline Blackjack --run-dir ./runs/it_20260325-094443_blackjack_gemini_rt --realtime --provider gemini --max-units 15 --yes
+[09:52:36] [INIT] Config: /Users/andrewstellman/Documents/Game/octobatch-awesome-copilot/pipelines/Blackjack/config.yaml
+[09:52:36] [INIT] Provider override: gemini
+[09:52:36] [INIT] Applied overrides: provider=gemini, model=None
+[09:52:36] [INIT] Copied item source: items.yaml
+[09:52:36] [INIT] Copied templates directory: templates
+[09:52:36] [INIT] Copied schemas directory: schemas
+[09:52:36] [INIT] Config snapshot saved to run directory
+[09:52:37] [INIT] Generated 15 units (3 base × 300 repetitions, limited from 900)
+[09:52:37] [INIT] Created 1 chunks (chunk_size=100)
+[09:52:37] [INIT] Pipeline: deal_cards -> play_hand -> verify_hand -> verify_strategy -> analyze_difficulty
+[09:52:37] [INIT] Run initialized successfully
+[09:52:37] [REALTIME] Gemini API key (GOOGLE_API_KEY): AVAILABLE
+[09:52:37] [REALTIME] Starting real-time execution
+[09:52:37] [REALTIME] Running deal_cards with gemini/gemini-2.0-flash-001 (default)
+Run initialized: runs/it_20260325-094443_blackjack_gemini_rt
+  Units: 15
+  Chunks: 1
+  Pipeline: deal_cards -> play_hand -> verify_hand -> verify_strategy -> analyze_difficulty
+[09:52:37] Real-time mode (2x cost)
+[09:52:37] Running deal_cards with gemini/gemini-2.0-flash-001 (default)
+[09:52:37] Running deal_cards (15 units)...
+[09:52:37] [1/15] the_pro__rep0000 ✓
+[09:52:37] [2/15] the_gambler__rep0000 ✓
+[09:52:37] [3/15] the_coward__rep0000 ✓
+[09:52:37] [4/15] the_pro__rep0001 ✓
+[09:52:37] [5/15] the_gambler__rep0001 ✓
+[09:52:37] [6/15] the_coward__rep0001 ✓
+[09:52:37] [7/15] the_pro__rep0002 ✓
+[09:52:37] [8/15] the_gambler__rep0002 ✓
+[09:52:37] [9/15] the_coward__rep0002 ✓
+[09:52:37] [10/15] the_pro__rep0003 ✓
+[09:52:37] [11/15] the_gambler__rep0003 ✓
+[09:52:37] [12/15] the_coward__rep0003 ✓
+[09:52:37] [13/15] the_pro__rep0004 ✓
+[09:52:37] [14/15] the_gambler__rep0004 ✓
+[09:52:37] [15/15] the_coward__rep0004 ✓
+[09:52:37] [REALTIME] Running play_hand with gemini/gemini-2.0-flash-001 (default)
+[09:52:37] deal_cards: 15/15 valid (0.0s) | 0 tokens | $0.0000
+[09:52:37] Running play_hand with gemini/gemini-2.0-flash-001 (default)
+[09:52:37] Running play_hand (15 units)...
+[09:52:39] [1/15] the_pro__rep0000 ✓ | 1,856 tokens | $0.0004 | ~28s left
+[09:52:42] [2/15] the_gambler__rep0000 ✓ | 3,628 tokens | $0.0008 | ~28s left
+[09:52:44] [3/15] the_coward__rep0000 ✓ | 5,430 tokens | $0.0012 | ~27s left
+[09:52:47] [4/15] the_pro__rep0001 ✓ | 7,263 tokens | $0.0015 | ~25s left
+[09:52:49] [5/15] the_gambler__rep0001 ✓ | 9,033 tokens | $0.0019 | ~22s left
+[09:52:51] [6/15] the_coward__rep0001 ✓ | 10,800 tokens | $0.0023 | ~20s left
+[09:52:54] [7/15] the_pro__rep0002 ✓ | 12,656 tokens | $0.0027 | ~18s left
+[09:52:56] [8/15] the_gambler__rep0002 ✓ | 14,438 tokens | $0.0031 | ~16s left
+[09:52:58] [9/15] the_coward__rep0002 ✓ | 16,226 tokens | $0.0034 | ~13s left
+[09:53:01] [10/15] the_pro__rep0003 ✓ | 18,101 tokens | $0.0039 | ~11s left
+[09:53:03] [11/15] the_gambler__rep0003 ✓ | 19,934 tokens | $0.0043 | ~9s left
+[09:53:06] [12/15] the_coward__rep0003 ✓ | 21,714 tokens | $0.0046 | ~7s left
+[09:53:08] [13/15] the_pro__rep0004 ✓ | 23,521 tokens | $0.0050 | ~4s left
+[09:53:10] [14/15] the_gambler__rep0004 ✓ | 25,321 tokens | $0.0054 | ~2s left
+[09:53:12] [15/15] the_coward__rep0004 ✓ | 27,059 tokens | $0.0057
+[09:53:12] [VALIDATE] chunk_000/play_hand: Starting validation of 15 units (timeout=600s)
+[09:53:12] [VALIDATE] chunk_000/play_hand: Running schema validation...
+[09:53:12] [VALIDATE] chunk_000/play_hand: Schema validation complete: 15 passed, 0 failed (0.2s)
+[09:53:12] [VALIDATE] chunk_000/play_hand: Running business logic validation on 15 records (599s remaining)...
+[09:53:12] [VALIDATE] chunk_000/play_hand: Subprocess pipeline complete (0.2s)
+[09:53:12] [VALIDATE] chunk_000: Writing unit 10/15 (Last 10 took 0.00s)
+[09:53:12] [VALIDATE] chunk_000/play_hand: Validation complete: 15 valid, 0 failed
+[09:53:12] [REALTIME] Running verify_hand with gemini/gemini-2.0-flash-001 (default)
+[09:53:12] play_hand: 15/15 valid (34.9s) | 27,059 tokens | $0.0057
+[09:53:12] Running verify_hand with gemini/gemini-2.0-flash-001 (default)
+[09:53:12] Running verify_hand (15 units)...
+[09:53:12] [1/15] the_pro__rep0000 ✓
+[09:53:12] [2/15] the_gambler__rep0000 ✓
+[09:53:12] [3/15] the_coward__rep0000 ✓
+[09:53:12] [4/15] the_pro__rep0001 ✓
+[09:53:12] [5/15] the_gambler__rep0001 ✓
+[09:53:12] [6/15] the_coward__rep0001 ✓
+[09:53:12] [7/15] the_pro__rep0002 ✓
+[09:53:12] [8/15] the_gambler__rep0002 ✓
+[09:53:12] [9/15] the_coward__rep0002 ✓
+[09:53:12] [10/15] the_pro__rep0003 ✓
+[09:53:12] [11/15] the_gambler__rep0003 ✓
+[09:53:12] [12/15] the_coward__rep0003 ✓
+[09:53:12] [13/15] the_pro__rep0004 ✓
+[09:53:12] [14/15] the_gambler__rep0004 ✓
+[09:53:12] [15/15] the_coward__rep0004 ✓
+[09:53:12] [EXPRESSION] chunk_000: Running validation for expression step 'verify_hand'
+[09:53:12] [VALIDATE] chunk_000/verify_hand: Starting validation of 15 units (timeout=600s)
+[09:53:12] [VALIDATE] chunk_000/verify_hand: Running business logic validation (no schema)...
+[09:53:12] [VALIDATE] chunk_000/verify_hand: Subprocess pipeline complete (0.1s)
+[09:53:12] [VALIDATE] chunk_000: Writing unit 10/15 (Last 10 took 0.00s)
+[09:53:12] [VALIDATE] chunk_000/verify_hand: Validation complete: 13 valid, 2 failed
+[09:53:12] [EXPRESSION] chunk_000: Marked 2 validation failures as exhausted for expression step 'verify_hand'
+[09:53:12] [REALTIME] Running verify_strategy with gemini/gemini-2.0-flash-001 (default)
+[09:53:12] verify_hand: 13/15 valid (0.1s) | 0 tokens | $0.0000
+[09:53:12] Running verify_strategy with gemini/gemini-2.0-flash-001 (default)
+[09:53:12] Running verify_strategy (15 units)...
+[09:53:12] [1/15] the_pro__rep0000 ✓
+[09:53:12] [2/15] the_gambler__rep0000 ✓
+[09:53:12] [3/15] the_coward__rep0000 ✓
+[09:53:12] [4/15] the_pro__rep0001 ✓
+[09:53:12] [5/15] the_coward__rep0001 ✓
+[09:53:12] [6/15] the_pro__rep0002 ✓
+[09:53:12] [7/15] the_gambler__rep0002 ✓
+[09:53:12] [8/15] the_coward__rep0002 ✓
+[09:53:12] [9/15] the_pro__rep0003 ✓
+[09:53:12] [10/15] the_gambler__rep0003 ✓
+[09:53:12] [11/15] the_pro__rep0004 ✓
+[09:53:12] [12/15] the_gambler__rep0004 ✓
+[09:53:12] [13/15] the_coward__rep0004 ✓
+[09:53:12] [EXPRESSION] chunk_000: Running validation for expression step 'verify_strategy'
+[09:53:12] [VALIDATE] chunk_000/verify_strategy: Starting validation of 13 units (timeout=600s)
+[09:53:12] [VALIDATE] chunk_000/verify_strategy: Running business logic validation (no schema)...
+[09:53:13] [VALIDATE] chunk_000/verify_strategy: Subprocess pipeline complete (0.1s)
+[09:53:13] [VALIDATE] chunk_000: Writing unit 10/13 (Last 10 took 0.00s)
+[09:53:13] [VALIDATE] chunk_000/verify_strategy: Validation complete: 12 valid, 1 failed
+[09:53:13] [EXPRESSION] chunk_000: Marked 1 validation failures as exhausted for expression step 'verify_strategy'
+[09:53:13] [REALTIME] Running analyze_difficulty with gemini/gemini-2.0-flash-001 (default)
+[09:53:13] verify_strategy: 12/13 valid (0.1s) | 0 tokens | $0.0000
+[09:53:13] Running analyze_difficulty with gemini/gemini-2.0-flash-001 (default)
+[09:53:13] Running analyze_difficulty (15 units)...
+[09:53:14] [1/15] the_pro__rep0000 ✓ | 598 tokens | $0.0001 | ~17s left
+[09:53:15] [2/15] the_gambler__rep0000 ✓ | 1,133 tokens | $0.0003 | ~18s left
+[09:53:17] [3/15] the_coward__rep0000 ✓ | 1,744 tokens | $0.0004 | ~18s left
+[09:53:19] [4/15] the_pro__rep0001 ✓ | 2,318 tokens | $0.0005 | ~16s left
+[09:53:21] [5/15] the_coward__rep0001 ✓ | 2,918 tokens | $0.0007 | ~15s left
+[09:53:22] [6/15] the_pro__rep0002 ✓ | 3,520 tokens | $0.0008 | ~14s left
+[09:53:24] [7/15] the_gambler__rep0002 ✓ | 4,080 tokens | $0.0009 | ~13s left
+[09:53:26] [8/15] the_coward__rep0002 ✓ | 4,676 tokens | $0.0011 | ~11s left
+[09:53:27] [9/15] the_gambler__rep0003 ✓ | 5,280 tokens | $0.0012 | ~9s left
+[09:53:29] [10/15] the_pro__rep0004 ✓ | 5,846 tokens | $0.0013 | ~8s left
+[09:53:31] [11/15] the_gambler__rep0004 ✓ | 6,404 tokens | $0.0015 | ~6s left
+[09:53:32] [12/15] the_coward__rep0004 ✓ | 6,947 tokens | $0.0016 | ~4s left
+[09:53:32] [VALIDATE] chunk_000/analyze_difficulty: Starting validation of 12 units (timeout=600s)
+[09:53:32] [VALIDATE] chunk_000/analyze_difficulty: Running schema validation...
+[09:53:32] [VALIDATE] chunk_000/analyze_difficulty: Schema validation complete: 12 passed, 0 failed (0.1s)
+[09:53:32] [VALIDATE] chunk_000/analyze_difficulty: Running business logic validation on 12 records (599s remaining)...
+[09:53:32] [VALIDATE] chunk_000/analyze_difficulty: Subprocess pipeline complete (0.2s)
+[09:53:32] [VALIDATE] chunk_000: Writing unit 10/12 (Last 10 took 0.00s)
+[09:53:32] [VALIDATE] chunk_000/analyze_difficulty: Validation complete: 12 valid, 0 failed
+[09:53:32] [POST-PROCESS] Running: Strategy Comparison...
+[09:53:32] [POST-PROCESS] Strategy Comparison: Output written to runs/it_20260325-094443_blackjack_gemini_rt/strategy_comparison.txt
+[09:53:32] [POST-PROCESS] Strategy Comparison: Loading results from runs/it_20260325-094443_blackjack_gemini_rt...
+[09:53:32] [POST-PROCESS] Strategy Comparison: Reading final step 'analyze_difficulty' results...
+[09:53:32] [POST-PROCESS] Strategy Comparison: Loaded 12 results
+[09:53:32] [POST-PROCESS] Running: Difficulty Analysis...
+[09:53:32] [POST-PROCESS] Difficulty Analysis: Output written to runs/it_20260325-094443_blackjack_gemini_rt/difficulty_analysis.txt
+[09:53:32] [POST-PROCESS] Difficulty Analysis: Loading results from runs/it_20260325-094443_blackjack_gemini_rt...
+[09:53:32] [POST-PROCESS] Difficulty Analysis: Reading final step 'analyze_difficulty' results...
+[09:53:32] [POST-PROCESS] Difficulty Analysis: Loaded 12 results
+[09:53:32] [POST-PROCESS] Running: Results CSV...
+[09:53:32] [POST-PROCESS] Results CSV: Output written to runs/it_20260325-094443_blackjack_gemini_rt/results.csv
+[09:53:32] [POST-PROCESS] Results CSV: Loading results from runs/it_20260325-094443_blackjack_gemini_rt...
+[09:53:32] [POST-PROCESS] Results CSV: Reading final step 'analyze_difficulty' results...
+[09:53:32] [POST-PROCESS] Results CSV: Loaded 12 results
+[09:53:32] [REALTIME] Complete: 67 valid, 0 retried, 3 failed, cost=$0.0073
+[09:53:32] [COMPLETE] Run completed successfully
+[09:53:32] analyze_difficulty: 12/12 valid (19.7s) | 6,947 tokens | $0.0016
+[09:53:32] [POST-PROCESS] Compress Raw Results: Compressed 5 file(s)
+[09:53:32] Pipeline complete: 67 valid, 3 failed
+[09:53:32] Total: 34,006 tokens (29,065 in + 4,941 out) | $0.0073

@@ -1,0 +1,84 @@
+[11:43:11] [INIT] Starting new run
+[11:43:11] [INIT] Command: ./scripts/orchestrate.py --init --pipeline DrunkenSailor --run-dir ./runs/it_20260325-113335_sailor_openai_rt --realtime --provider openai --max-units 15 --yes
+[11:43:11] [INIT] Config: /Users/andrewstellman/Documents/Game/octobatch-awesome-copilot/pipelines/DrunkenSailor/config.yaml
+[11:43:11] [INIT] Provider override: openai
+[11:43:11] [INIT] Applied overrides: provider=openai, model=None
+[11:43:11] [INIT] Copied item source: items.yaml
+[11:43:11] [INIT] Copied templates directory: templates
+[11:43:11] [INIT] Copied schemas directory: schemas
+[11:43:11] [INIT] Config snapshot saved to run directory
+[11:43:11] [INIT] Generated 15 units (1 base × 100 repetitions, limited from 100)
+[11:43:11] [INIT] Created 1 chunks (chunk_size=100)
+[11:43:11] [INIT] Pipeline: random_walk -> analyze
+[11:43:11] [INIT] Run initialized successfully
+[11:43:11] [REALTIME] OpenAI API key: AVAILABLE
+[11:43:11] [REALTIME] Starting real-time execution
+[11:43:11] [REALTIME] Running random_walk with openai/gpt-4o-mini (default)
+Run initialized: runs/it_20260325-113335_sailor_openai_rt
+  Units: 15
+  Chunks: 1
+  Pipeline: random_walk -> analyze
+[11:43:11] Real-time mode (2x cost)
+[11:43:11] Running random_walk with openai/gpt-4o-mini (default)
+[11:43:11] Running random_walk (15 units)...
+[11:43:11] [1/15] start_at_5__rep0000 ✓
+[11:43:11] [2/15] start_at_5__rep0001 ✓
+[11:43:12] [3/15] start_at_5__rep0002 ✓
+[11:43:12] [4/15] start_at_5__rep0003 ✓
+[11:43:12] [5/15] start_at_5__rep0004 ✓
+[11:43:12] [6/15] start_at_5__rep0005 ✓
+[11:43:12] [7/15] start_at_5__rep0006 ✓
+[11:43:12] [8/15] start_at_5__rep0007 ✓
+[11:43:12] [9/15] start_at_5__rep0008 ✓
+[11:43:12] [10/15] start_at_5__rep0009 ✓
+[11:43:12] [11/15] start_at_5__rep0010 ✓
+[11:43:12] [12/15] start_at_5__rep0011 ✓
+[11:43:12] [13/15] start_at_5__rep0012 ✓
+[11:43:12] [14/15] start_at_5__rep0013 ✓
+[11:43:12] [15/15] start_at_5__rep0014 ✓
+[11:43:12] [REALTIME] Running analyze with openai/gpt-4o-mini (default)
+[11:43:12] random_walk: 15/15 valid (0.1s) | 0 tokens | $0.0000
+[11:43:12] Running analyze with openai/gpt-4o-mini (default)
+[11:43:12] Running analyze (15 units)...
+[11:43:14] [1/15] start_at_5__rep0000 ✓ | 330 tokens | $0.0001 | ~34s left
+[11:43:17] [2/15] start_at_5__rep0001 ✓ | 636 tokens | $0.0002 | ~34s left
+[11:43:25] [3/15] start_at_5__rep0002 ✓ | 1,542 tokens | $0.0005 | ~52s left
+[11:43:28] [4/15] start_at_5__rep0003 ✓ | 1,968 tokens | $0.0006 | ~46s left
+[11:43:31] [5/15] start_at_5__rep0004 ✓ | 2,274 tokens | $0.0007 | ~39s left
+[11:43:33] [6/15] start_at_5__rep0005 ✓ | 2,556 tokens | $0.0007 | ~32s left
+[11:43:36] [7/15] start_at_5__rep0006 ✓ | 2,874 tokens | $0.0008 | ~27s left
+[11:43:40] [8/15] start_at_5__rep0007 ✓ | 3,348 tokens | $0.0010 | ~24s left
+[11:43:46] [9/15] start_at_5__rep0008 ✓ | 4,098 tokens | $0.0012 | ~22s left
+[11:43:48] [10/15] start_at_5__rep0009 ✓ | 4,452 tokens | $0.0013 | ~18s left
+[11:43:54] [11/15] start_at_5__rep0010 ✓ | 4,986 tokens | $0.0015 | ~15s left
+[11:43:59] [12/15] start_at_5__rep0011 ✓ | 5,574 tokens | $0.0017 | ~11s left
+[11:44:01] [13/15] start_at_5__rep0012 ✓ | 5,868 tokens | $0.0017 | ~7s left
+[11:44:05] [14/15] start_at_5__rep0013 ✓ | 6,246 tokens | $0.0018 | ~3s left
+[11:44:11] [15/15] start_at_5__rep0014 ✓ | 6,900 tokens | $0.0021
+[11:44:11] [VALIDATE] chunk_000/analyze: Starting validation of 15 units (timeout=600s)
+[11:44:11] [VALIDATE] chunk_000/analyze: Running schema validation...
+[11:44:11] [VALIDATE] chunk_000/analyze: Schema validation complete: 15 passed, 0 failed (0.2s)
+[11:44:11] [VALIDATE] chunk_000/analyze: Running business logic validation on 15 records (599s remaining)...
+[11:44:11] [VALIDATE] chunk_000/analyze: Subprocess pipeline complete (0.2s)
+[11:44:11] [VALIDATE] chunk_000: Writing unit 10/15 (Last 10 took 0.00s)
+[11:44:11] [VALIDATE] chunk_000/analyze: Validation complete: 15 valid, 0 failed
+[11:44:11] [POST-PROCESS] Running: Outcome Distribution...
+[11:44:12] [POST-PROCESS] Outcome Distribution: Output written to runs/it_20260325-113335_sailor_openai_rt/outcome_distribution.txt
+[11:44:12] [POST-PROCESS] Outcome Distribution: Loading results from runs/it_20260325-113335_sailor_openai_rt...
+[11:44:12] [POST-PROCESS] Outcome Distribution: Reading final step 'analyze' results...
+[11:44:12] [POST-PROCESS] Outcome Distribution: Loaded 15 results
+[11:44:12] [POST-PROCESS] Running: Steps by Scenario...
+[11:44:12] [POST-PROCESS] Steps by Scenario: Output written to runs/it_20260325-113335_sailor_openai_rt/steps_by_scenario.txt
+[11:44:12] [POST-PROCESS] Steps by Scenario: Loading results from runs/it_20260325-113335_sailor_openai_rt...
+[11:44:12] [POST-PROCESS] Steps by Scenario: Reading final step 'analyze' results...
+[11:44:12] [POST-PROCESS] Steps by Scenario: Loaded 15 results
+[11:44:12] [POST-PROCESS] Running: Steps by Outcome...
+[11:44:12] [POST-PROCESS] Steps by Outcome: Output written to runs/it_20260325-113335_sailor_openai_rt/steps_by_outcome.txt
+[11:44:12] [POST-PROCESS] Steps by Outcome: Loading results from runs/it_20260325-113335_sailor_openai_rt...
+[11:44:12] [POST-PROCESS] Steps by Outcome: Reading final step 'analyze' results...
+[11:44:12] [POST-PROCESS] Steps by Outcome: Loaded 15 results
+[11:44:12] [REALTIME] Complete: 30 valid, 0 retried, 0 failed, cost=$0.0021
+[11:44:12] [COMPLETE] Run completed successfully
+[11:44:11] analyze: 15/15 valid (59.8s) | 6,900 tokens | $0.0021
+[11:44:12] Pipeline complete: 30 valid, 0 failed
+[11:44:12] Total: 6,900 tokens (4,632 in + 2,268 out) | $0.0021

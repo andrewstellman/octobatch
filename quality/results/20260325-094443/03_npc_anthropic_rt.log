@@ -1,0 +1,92 @@
+[09:44:52] [INIT] Starting new run
+[09:44:52] [INIT] Command: ./scripts/orchestrate.py --init --pipeline NPCDialog --run-dir ./runs/it_20260325-094443_npc_anthropic_rt --realtime --provider anthropic --max-units 12 --yes
+[09:44:52] [INIT] Config: /Users/andrewstellman/Documents/Game/octobatch-awesome-copilot/pipelines/NPCDialog/config.yaml
+[09:44:52] [INIT] Provider override: anthropic
+[09:44:52] [INIT] Applied overrides: provider=anthropic, model=None
+[09:44:52] [INIT] Copied item source: items.yaml
+[09:44:52] [INIT] Copied templates directory: templates
+[09:44:52] [INIT] Copied schemas directory: schemas
+[09:44:52] [INIT] Config snapshot saved to run directory
+[09:44:52] [INIT] Generated 12 units (cross_product: 3 groups)
+[09:44:52] [INIT] Created 1 chunks (chunk_size=60)
+[09:44:52] [INIT] Pipeline: generate_dialog -> score_consistency
+[09:44:52] [INIT] Run initialized successfully
+[09:44:52] [REALTIME] Anthropic API key: AVAILABLE
+[09:44:53] [REALTIME] Starting real-time execution
+[09:44:53] [REALTIME] Running generate_dialog with anthropic/claude-sonnet-4-20250514 (default)
+Run initialized: runs/it_20260325-094443_npc_anthropic_rt
+  Units: 12
+  Chunks: 1
+  Pipeline: generate_dialog -> score_consistency
+[09:44:53] Real-time mode (2x cost)
+[09:44:53] Running generate_dialog with anthropic/claude-sonnet-4-20250514 (default)
+[09:44:53] Running generate_dialog (12 units)...
+[09:45:02] [1/12] gruff_blacksmith-friendly-directions ✓ | 682 tokens | $0.0056 | ~1m 39s left
+[09:45:11] [2/12] gruff_blacksmith-friendly-bartering ✓ | 1,350 tokens | $0.0111 | ~1m 33s left
+[09:45:22] [3/12] gruff_blacksmith-friendly-quest_info ✓ | 2,068 tokens | $0.0174 | ~1m 27s left
+[09:45:29] [4/12] gruff_blacksmith-aggressive-directions ✓ | 2,695 tokens | $0.0222 | ~1m 13s left
+[09:45:38] [5/12] gruff_blacksmith-aggressive-bartering ✓ | 3,362 tokens | $0.0277 | ~1m 2s left
+[09:45:47] [6/12] gruff_blacksmith-aggressive-quest_info ✓ | 4,041 tokens | $0.0334 | ~54s left
+[09:45:56] [7/12] gruff_blacksmith-desperate-directions ✓ | 4,697 tokens | $0.0387 | ~45s left
+[09:46:06] [8/12] gruff_blacksmith-desperate-bartering ✓ | 5,349 tokens | $0.0439 | ~36s left
+[09:46:15] [9/12] gruff_blacksmith-desperate-quest_info ✓ | 6,008 tokens | $0.0492 | ~27s left
+[09:46:24] [10/12] gruff_blacksmith-suspicious-directions ✓ | 6,667 tokens | $0.0545 | ~18s left
+[09:46:31] [11/12] gruff_blacksmith-suspicious-bartering ✓ | 7,284 tokens | $0.0591 | ~8s left
+[09:46:44] [12/12] gruff_blacksmith-suspicious-quest_info ✓ | 8,030 tokens | $0.0657
+[09:46:44] [VALIDATE] chunk_000/generate_dialog: Starting validation of 12 units (timeout=600s)
+[09:46:44] [VALIDATE] chunk_000/generate_dialog: Running schema validation...
+[09:46:44] [VALIDATE] chunk_000/generate_dialog: Schema validation complete: 12 passed, 0 failed (0.1s)
+[09:46:44] [VALIDATE] chunk_000/generate_dialog: Running business logic validation on 12 records (599s remaining)...
+[09:46:44] [VALIDATE] chunk_000/generate_dialog: Subprocess pipeline complete (0.2s)
+[09:46:44] [VALIDATE] chunk_000: Writing unit 10/12 (Last 10 took 0.00s)
+[09:46:44] [VALIDATE] chunk_000/generate_dialog: Validation complete: 12 valid, 0 failed
+[09:46:44] [REALTIME] Running score_consistency with anthropic/claude-sonnet-4-20250514 (default)
+[09:46:44] generate_dialog: 12/12 valid (111.1s) | 8,030 tokens | $0.0657
+[09:46:44] Running score_consistency with anthropic/claude-sonnet-4-20250514 (default)
+[09:46:44] Running score_consistency (12 units)...
+[09:46:51] [1/12] gruff_blacksmith-friendly-directions ✓ | 1,412 tokens | $0.0081 | ~1m 16s left
+[09:46:59] [2/12] gruff_blacksmith-friendly-bartering ✓ | 2,809 tokens | $0.0161 | ~1m 17s left
+[09:47:07] [3/12] gruff_blacksmith-friendly-quest_info ✓ | 4,240 tokens | $0.0240 | ~1m 9s left
+[09:47:15] [4/12] gruff_blacksmith-aggressive-directions ✓ | 5,572 tokens | $0.0315 | ~1m 2s left
+[09:47:22] [5/12] gruff_blacksmith-aggressive-bartering ✓ | 6,973 tokens | $0.0395 | ~53s left
+[09:47:29] [6/12] gruff_blacksmith-aggressive-quest_info ✓ | 8,355 tokens | $0.0471 | ~45s left
+[09:47:37] [7/12] gruff_blacksmith-desperate-directions ✓ | 9,820 tokens | $0.0564 | ~38s left
+[09:47:45] [8/12] gruff_blacksmith-desperate-bartering ✓ | 11,166 tokens | $0.0637 | ~30s left
+[09:47:52] [9/12] gruff_blacksmith-desperate-quest_info ✓ | 12,544 tokens | $0.0715 | ~22s left
+[09:47:59] [10/12] gruff_blacksmith-suspicious-directions ✓ | 13,881 tokens | $0.0787 | ~15s left
+[09:48:06] [11/12] gruff_blacksmith-suspicious-bartering ✓ | 15,185 tokens | $0.0859 | ~7s left
+[09:48:13] [12/12] gruff_blacksmith-suspicious-quest_info ✓ | 16,738 tokens | $0.0953
+[09:48:13] [VALIDATE] chunk_000/score_consistency: Starting validation of 12 units (timeout=600s)
+[09:48:13] [VALIDATE] chunk_000/score_consistency: Running schema validation...
+[09:48:13] [VALIDATE] chunk_000/score_consistency: Schema validation complete: 12 passed, 0 failed (0.2s)
+[09:48:13] [VALIDATE] chunk_000/score_consistency: Running business logic validation on 12 records (599s remaining)...
+[09:48:13] [VALIDATE] chunk_000/score_consistency: Subprocess pipeline complete (0.3s)
+[09:48:13] [VALIDATE] chunk_000: Writing unit 10/12 (Last 10 took 0.00s)
+[09:48:13] [VALIDATE] chunk_000/score_consistency: Validation complete: 12 valid, 0 failed
+[09:48:14] [POST-PROCESS] Running: Tone Distribution by NPC...
+[09:48:14] [POST-PROCESS] Tone Distribution by NPC: Output written to runs/it_20260325-094443_npc_anthropic_rt/tone_distribution.txt
+[09:48:14] [POST-PROCESS] Tone Distribution by NPC: Loading results from runs/it_20260325-094443_npc_anthropic_rt...
+[09:48:14] [POST-PROCESS] Tone Distribution by NPC: Reading final step 'score_consistency' results...
+[09:48:14] [POST-PROCESS] Tone Distribution by NPC: Loaded 12 results
+[09:48:14] [POST-PROCESS] Running: Personality Consistency Scores...
+[09:48:14] [POST-PROCESS] Personality Consistency Scores: Output written to runs/it_20260325-094443_npc_anthropic_rt/personality_scores.txt
+[09:48:14] [POST-PROCESS] Personality Consistency Scores: Loading results from runs/it_20260325-094443_npc_anthropic_rt...
+[09:48:14] [POST-PROCESS] Personality Consistency Scores: Reading final step 'score_consistency' results...
+[09:48:14] [POST-PROCESS] Personality Consistency Scores: Loaded 12 results
+[09:48:14] [POST-PROCESS] Running: Mood Responsiveness Scores...
+[09:48:14] [POST-PROCESS] Mood Responsiveness Scores: Output written to runs/it_20260325-094443_npc_anthropic_rt/mood_scores.txt
+[09:48:14] [POST-PROCESS] Mood Responsiveness Scores: Loading results from runs/it_20260325-094443_npc_anthropic_rt...
+[09:48:14] [POST-PROCESS] Mood Responsiveness Scores: Reading final step 'score_consistency' results...
+[09:48:14] [POST-PROCESS] Mood Responsiveness Scores: Loaded 12 results
+[09:48:14] [POST-PROCESS] Running: Retry Analysis...
+[09:48:14] [POST-PROCESS] Retry Analysis: Output written to runs/it_20260325-094443_npc_anthropic_rt/retry_analysis.txt
+[09:48:14] [POST-PROCESS] Running: Results CSV...
+[09:48:14] [POST-PROCESS] Results CSV: Output written to runs/it_20260325-094443_npc_anthropic_rt/results.csv
+[09:48:14] [POST-PROCESS] Results CSV: Loading results from runs/it_20260325-094443_npc_anthropic_rt...
+[09:48:14] [POST-PROCESS] Results CSV: Reading final step 'score_consistency' results...
+[09:48:14] [POST-PROCESS] Results CSV: Loaded 12 results
+[09:48:14] [REALTIME] Complete: 24 valid, 0 retried, 0 failed, cost=$0.1610
+[09:48:14] [COMPLETE] Run completed successfully
+[09:48:14] score_consistency: 12/12 valid (89.7s) | 16,738 tokens | $0.0953
+[09:48:14] Pipeline complete: 24 valid, 0 failed
+[09:48:14] Total: 24,768 tokens (17,546 in + 7,222 out) | $0.1610

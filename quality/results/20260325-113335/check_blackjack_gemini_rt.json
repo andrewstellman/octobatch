@@ -1,0 +1,25 @@
+{
+  "pipeline": "Blackjack",
+  "final_step": "analyze_difficulty",
+  "validated_count": 11,
+  "failure_count": 0,
+  "status": "complete",
+  "checks": {
+    "all_strategies_present": {
+      "pass": true,
+      "detail": "Found: {'The Gambler', 'The Pro', 'The Coward'}"
+    },
+    "result_valid_enum": {
+      "pass": true,
+      "detail": "All 11 valid",
+      "invalid_samples": []
+    },
+    "strategy_correct_gate": {
+      "pass": true,
+      "detail": "All 11 correct",
+      "incorrect_units": []
+    }
+  },
+  "cost": 0.001333,
+  "duration": "57s"
+}

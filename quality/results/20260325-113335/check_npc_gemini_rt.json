@@ -1,0 +1,30 @@
+{
+  "pipeline": "NPCDialog",
+  "final_step": "score_consistency",
+  "validated_count": 11,
+  "failure_count": 1,
+  "status": "complete",
+  "checks": {
+    "tone_valid_enum": {
+      "pass": true,
+      "detail": "All 11 valid",
+      "invalid_samples": [],
+      "tone_distribution": {
+        "cold": 8,
+        "hostile": 3
+      }
+    },
+    "personality_above_gate": {
+      "pass": true,
+      "detail": "All 11 >= 0.6",
+      "min_value": 0.9
+    },
+    "mood_responsiveness_above_gate": {
+      "pass": true,
+      "detail": "All 11 >= 0.4",
+      "min_value": 0.8
+    }
+  },
+  "cost": 0.00339,
+  "duration": "1m 6s"
+}

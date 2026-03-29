@@ -1,0 +1,17 @@
+[11:57:25] [INIT] Starting new run
+[11:57:25] [INIT] Command: ./scripts/orchestrate.py --init --pipeline DrunkenSailor --run-dir ./runs/it_20260325-113335_sailor_gemini_batch --provider gemini --max-units 120 --yes
+[11:57:25] [INIT] Config: /Users/andrewstellman/Documents/Game/octobatch-awesome-copilot/pipelines/DrunkenSailor/config.yaml
+[11:57:25] [INIT] Provider override: gemini
+[11:57:25] [INIT] Applied overrides: provider=gemini, model=None
+[11:57:25] [INIT] Copied item source: items.yaml
+[11:57:25] [INIT] Copied templates directory: templates
+[11:57:26] [INIT] Copied schemas directory: schemas
+[11:57:26] [INIT] Config snapshot saved to run directory
+[11:57:26] [INIT] Generated 100 units (1 base × 100 repetitions)
+[11:57:26] [INIT] Created 1 chunks (chunk_size=100)
+[11:57:26] [INIT] Pipeline: random_walk -> analyze
+[11:57:26] [INIT] Run initialized successfully
+Run initialized: runs/it_20260325-113335_sailor_gemini_batch
+  Units: 100
+  Chunks: 1
+  Pipeline: random_walk -> analyze

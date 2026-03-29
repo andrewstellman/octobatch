@@ -1,0 +1,30 @@
+{
+  "name": "it_20260325-094443_sailor_gemini_batch",
+  "status": "complete",
+  "pipeline_name": "DrunkenSailor",
+  "provider": "gemini",
+  "model": "gemini-2.0-flash-001",
+  "mode": "batch",
+  "total_units": 100,
+  "valid_units": 100,
+  "failed_units": 0,
+  "cost": 0.0,
+  "total_tokens": 43637,
+  "input_tokens": 29525,
+  "output_tokens": 14112,
+  "duration": "8m 42s",
+  "steps": [
+    {
+      "name": "random_walk",
+      "valid": 100,
+      "total": 100,
+      "state": "complete"
+    },
+    {
+      "name": "analyze",
+      "valid": 100,
+      "total": 100,
+      "state": "complete"
+    }
+  ]
+}

@@ -1,0 +1,84 @@
+[09:44:52] [INIT] Starting new run
+[09:44:52] [INIT] Command: ./scripts/orchestrate.py --init --pipeline DrunkenSailor --run-dir ./runs/it_20260325-094443_sailor_gemini_rt --realtime --provider gemini --max-units 15 --yes
+[09:44:52] [INIT] Config: /Users/andrewstellman/Documents/Game/octobatch-awesome-copilot/pipelines/DrunkenSailor/config.yaml
+[09:44:52] [INIT] Provider override: gemini
+[09:44:52] [INIT] Applied overrides: provider=gemini, model=None
+[09:44:52] [INIT] Copied item source: items.yaml
+[09:44:52] [INIT] Copied templates directory: templates
+[09:44:52] [INIT] Copied schemas directory: schemas
+[09:44:52] [INIT] Config snapshot saved to run directory
+[09:44:52] [INIT] Generated 15 units (1 base × 100 repetitions, limited from 100)
+[09:44:52] [INIT] Created 1 chunks (chunk_size=100)
+[09:44:52] [INIT] Pipeline: random_walk -> analyze
+[09:44:52] [INIT] Run initialized successfully
+[09:44:52] [REALTIME] Gemini API key (GOOGLE_API_KEY): AVAILABLE
+[09:44:54] [REALTIME] Starting real-time execution
+[09:44:54] [REALTIME] Running random_walk with gemini/gemini-2.0-flash-001 (default)
+Run initialized: runs/it_20260325-094443_sailor_gemini_rt
+  Units: 15
+  Chunks: 1
+  Pipeline: random_walk -> analyze
+[09:44:54] Real-time mode (2x cost)
+[09:44:54] Running random_walk with gemini/gemini-2.0-flash-001 (default)
+[09:44:54] Running random_walk (15 units)...
+[09:44:54] [1/15] start_at_5__rep0000 ✓
+[09:44:54] [2/15] start_at_5__rep0001 ✓
+[09:44:54] [3/15] start_at_5__rep0002 ✓
+[09:44:54] [4/15] start_at_5__rep0003 ✓
+[09:44:54] [5/15] start_at_5__rep0004 ✓
+[09:44:54] [6/15] start_at_5__rep0005 ✓
+[09:44:54] [7/15] start_at_5__rep0006 ✓
+[09:44:54] [8/15] start_at_5__rep0007 ✓
+[09:44:54] [9/15] start_at_5__rep0008 ✓
+[09:44:54] [10/15] start_at_5__rep0009 ✓
+[09:44:54] [11/15] start_at_5__rep0010 ✓
+[09:44:54] [12/15] start_at_5__rep0011 ✓
+[09:44:54] [13/15] start_at_5__rep0012 ✓
+[09:44:54] [14/15] start_at_5__rep0013 ✓
+[09:44:54] [15/15] start_at_5__rep0014 ✓
+[09:44:54] [REALTIME] Running analyze with gemini/gemini-2.0-flash-001 (default)
+[09:44:54] random_walk: 15/15 valid (0.1s) | 0 tokens | $0.0000
+[09:44:54] Running analyze with gemini/gemini-2.0-flash-001 (default)
+[09:44:54] Running analyze (15 units)...
+[09:44:55] [1/15] start_at_5__rep0000 ✓ | 365 tokens | $0.0001 | ~16s left
+[09:44:57] [2/15] start_at_5__rep0001 ✓ | 715 tokens | $0.0002 | ~20s left
+[09:45:00] [3/15] start_at_5__rep0002 ✓ | 1,656 tokens | $0.0005 | ~25s left
+[09:45:02] [4/15] start_at_5__rep0003 ✓ | 2,148 tokens | $0.0007 | ~22s left
+[09:45:04] [5/15] start_at_5__rep0004 ✓ | 2,487 tokens | $0.0008 | ~19s left
+[09:45:05] [6/15] start_at_5__rep0005 ✓ | 2,811 tokens | $0.0008 | ~16s left
+[09:45:06] [7/15] start_at_5__rep0006 ✓ | 3,164 tokens | $0.0009 | ~14s left
+[09:45:08] [8/15] start_at_5__rep0007 ✓ | 3,673 tokens | $0.0011 | ~12s left
+[09:45:11] [9/15] start_at_5__rep0008 ✓ | 4,458 tokens | $0.0014 | ~11s left
+[09:45:13] [10/15] start_at_5__rep0009 ✓ | 4,866 tokens | $0.0015 | ~9s left
+[09:45:15] [11/15] start_at_5__rep0010 ✓ | 5,433 tokens | $0.0017 | ~7s left
+[09:45:17] [12/15] start_at_5__rep0011 ✓ | 6,050 tokens | $0.0019 | ~5s left
+[09:45:19] [13/15] start_at_5__rep0012 ✓ | 6,388 tokens | $0.0019 | ~3s left
+[09:45:20] [14/15] start_at_5__rep0013 ✓ | 6,799 tokens | $0.0021 | ~1s left
+[09:45:22] [15/15] start_at_5__rep0014 ✓ | 7,488 tokens | $0.0023
+[09:45:22] [VALIDATE] chunk_000/analyze: Starting validation of 15 units (timeout=600s)
+[09:45:22] [VALIDATE] chunk_000/analyze: Running schema validation...
+[09:45:23] [VALIDATE] chunk_000/analyze: Schema validation complete: 15 passed, 0 failed (0.2s)
+[09:45:23] [VALIDATE] chunk_000/analyze: Running business logic validation on 15 records (599s remaining)...
+[09:45:23] [VALIDATE] chunk_000/analyze: Subprocess pipeline complete (0.2s)
+[09:45:23] [VALIDATE] chunk_000: Writing unit 10/15 (Last 10 took 0.00s)
+[09:45:23] [VALIDATE] chunk_000/analyze: Validation complete: 15 valid, 0 failed
+[09:45:23] [POST-PROCESS] Running: Outcome Distribution...
+[09:45:23] [POST-PROCESS] Outcome Distribution: Output written to runs/it_20260325-094443_sailor_gemini_rt/outcome_distribution.txt
+[09:45:23] [POST-PROCESS] Outcome Distribution: Loading results from runs/it_20260325-094443_sailor_gemini_rt...
+[09:45:23] [POST-PROCESS] Outcome Distribution: Reading final step 'analyze' results...
+[09:45:23] [POST-PROCESS] Outcome Distribution: Loaded 15 results
+[09:45:23] [POST-PROCESS] Running: Steps by Scenario...
+[09:45:23] [POST-PROCESS] Steps by Scenario: Output written to runs/it_20260325-094443_sailor_gemini_rt/steps_by_scenario.txt
+[09:45:23] [POST-PROCESS] Steps by Scenario: Loading results from runs/it_20260325-094443_sailor_gemini_rt...
+[09:45:23] [POST-PROCESS] Steps by Scenario: Reading final step 'analyze' results...
+[09:45:23] [POST-PROCESS] Steps by Scenario: Loaded 15 results
+[09:45:23] [POST-PROCESS] Running: Steps by Outcome...
+[09:45:23] [POST-PROCESS] Steps by Outcome: Output written to runs/it_20260325-094443_sailor_gemini_rt/steps_by_outcome.txt
+[09:45:23] [POST-PROCESS] Steps by Outcome: Loading results from runs/it_20260325-094443_sailor_gemini_rt...
+[09:45:23] [POST-PROCESS] Steps by Outcome: Reading final step 'analyze' results...
+[09:45:23] [POST-PROCESS] Steps by Outcome: Loaded 15 results
+[09:45:23] [REALTIME] Complete: 30 valid, 0 retried, 0 failed, cost=$0.0023
+[09:45:23] [COMPLETE] Run completed successfully
+[09:45:23] analyze: 15/15 valid (28.6s) | 7,488 tokens | $0.0023
+[09:45:23] Pipeline complete: 30 valid, 0 failed
+[09:45:23] Total: 7,488 tokens (4,902 in + 2,586 out) | $0.0023

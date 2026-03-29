@@ -1,0 +1,100 @@
+[11:43:14] [INIT] Starting new run
+[11:43:14] [INIT] Command: ./scripts/orchestrate.py --init --pipeline NPCDialog --run-dir ./runs/it_20260325-113335_npc_gemini_rt --realtime --provider gemini --max-units 12 --yes
+[11:43:14] [INIT] Config: /Users/andrewstellman/Documents/Game/octobatch-awesome-copilot/pipelines/NPCDialog/config.yaml
+[11:43:14] [INIT] Provider override: gemini
+[11:43:14] [INIT] Applied overrides: provider=gemini, model=None
+[11:43:14] [INIT] Copied item source: items.yaml
+[11:43:14] [INIT] Copied templates directory: templates
+[11:43:14] [INIT] Copied schemas directory: schemas
+[11:43:14] [INIT] Config snapshot saved to run directory
+[11:43:15] [INIT] Generated 12 units (cross_product: 3 groups)
+[11:43:15] [INIT] Created 1 chunks (chunk_size=60)
+[11:43:15] [INIT] Pipeline: generate_dialog -> score_consistency
+[11:43:15] [INIT] Run initialized successfully
+[11:43:15] [REALTIME] Gemini API key (GOOGLE_API_KEY): AVAILABLE
+[11:43:15] [REALTIME] Starting real-time execution
+[11:43:15] [REALTIME] Running generate_dialog with gemini/gemini-2.0-flash-001 (default)
+Run initialized: runs/it_20260325-113335_npc_gemini_rt
+  Units: 12
+  Chunks: 1
+  Pipeline: generate_dialog -> score_consistency
+[11:43:15] Real-time mode (2x cost)
+[11:43:15] Running generate_dialog with gemini/gemini-2.0-flash-001 (default)
+[11:43:15] Running generate_dialog (12 units)...
+[11:43:18] [1/12] gruff_blacksmith-friendly-directions ✓ | 573 tokens | $0.0002 | ~24s left
+[11:43:20] [2/12] gruff_blacksmith-friendly-bartering ✓ | 1,134 tokens | $0.0004 | ~25s left
+[11:43:23] [3/12] gruff_blacksmith-friendly-quest_info ✓ | 1,672 tokens | $0.0005 | ~22s left
+[11:43:25] [4/12] gruff_blacksmith-aggressive-directions ✓ | 2,202 tokens | $0.0007 | ~20s left
+[11:43:29] [5/12] gruff_blacksmith-aggressive-bartering ✓ | 2,844 tokens | $0.0009 | ~18s left
+[11:43:32] [6/12] gruff_blacksmith-aggressive-quest_info ✓ | 3,424 tokens | $0.0011 | ~16s left
+[11:43:35] [7/12] gruff_blacksmith-desperate-directions ✓ | 4,010 tokens | $0.0013 | ~13s left
+[11:43:37] [8/12] gruff_blacksmith-desperate-bartering ✓ | 4,576 tokens | $0.0015 | ~10s left
+[11:43:40] [9/12] gruff_blacksmith-desperate-quest_info ✓ | 5,184 tokens | $0.0017 | ~8s left
+[11:43:43] [10/12] gruff_blacksmith-suspicious-directions ✓ | 5,762 tokens | $0.0019 | ~5s left
+[11:43:45] [11/12] gruff_blacksmith-suspicious-bartering ✓ | 6,286 tokens | $0.0020 | ~2s left
+[11:43:48] [12/12] gruff_blacksmith-suspicious-quest_info ✓ | 6,865 tokens | $0.0022
+[11:43:48] [VALIDATE] chunk_000/generate_dialog: Starting validation of 12 units (timeout=600s)
+[11:43:48] [VALIDATE] chunk_000/generate_dialog: Running schema validation...
+[11:43:48] [VALIDATE] chunk_000/generate_dialog: Schema validation complete: 12 passed, 0 failed (0.2s)
+[11:43:48] [VALIDATE] chunk_000/generate_dialog: Running business logic validation on 12 records (599s remaining)...
+[11:43:48] [VALIDATE] chunk_000/generate_dialog: Subprocess pipeline complete (0.2s)
+[11:43:48] [VALIDATE] chunk_000: Writing unit 10/12 (Last 10 took 0.00s)
+[11:43:48] [VALIDATE] chunk_000/generate_dialog: Validation complete: 12 valid, 0 failed
+[11:43:48] [REALTIME] Running score_consistency with gemini/gemini-2.0-flash-001 (default)
+[11:43:48] generate_dialog: 12/12 valid (32.9s) | 6,865 tokens | $0.0022
+[11:43:48] Running score_consistency with gemini/gemini-2.0-flash-001 (default)
+[11:43:48] Running score_consistency (12 units)...
+[11:43:50] [1/12] gruff_blacksmith-friendly-directions ✓ | 1,140 tokens | $0.0003 | ~21s left
+[11:43:52] [2/12] gruff_blacksmith-friendly-bartering ✓ | 2,271 tokens | $0.0005 | ~20s left
+[11:43:55] [3/12] gruff_blacksmith-friendly-quest_info ✓ | 3,350 tokens | $0.0008 | ~18s left
+[11:43:57] [4/12] gruff_blacksmith-aggressive-directions ✓ | 4,471 tokens | $0.0010 | ~18s left
+[11:44:00] [5/12] gruff_blacksmith-aggressive-bartering ✓ | 5,713 tokens | $0.0013 | ~15s left
+[11:44:02] [6/12] gruff_blacksmith-aggressive-quest_info ✓ | 6,910 tokens | $0.0016 | ~13s left
+[11:44:05] [7/12] gruff_blacksmith-desperate-directions ✓ | 8,138 tokens | $0.0019 | ~11s left
+[11:44:08] [8/12] gruff_blacksmith-desperate-bartering ✓ | 9,335 tokens | $0.0022 | ~9s left
+[11:44:10] [9/12] gruff_blacksmith-desperate-quest_info ✓ | 10,513 tokens | $0.0025 | ~7s left
+[11:44:13] [10/12] gruff_blacksmith-suspicious-directions ✓ | 11,748 tokens | $0.0028 | ~4s left
+[11:44:16] [11/12] gruff_blacksmith-suspicious-bartering ✓ | 12,874 tokens | $0.0031 | ~2s left
+[11:44:18] [12/12] gruff_blacksmith-suspicious-quest_info ✓ | 14,056 tokens | $0.0034
+[11:44:18] [VALIDATE] chunk_000/score_consistency: Starting validation of 11 units (timeout=600s)
+[11:44:18] [VALIDATE] chunk_000/score_consistency: Running schema validation...
+[11:44:18] [VALIDATE] chunk_000/score_consistency: Schema validation complete: 10 passed, 1 failed (0.1s)
+[11:44:18] [VALIDATE] chunk_000/score_consistency: Running business logic validation on 10 records (599s remaining)...
+[11:44:19] [VALIDATE] chunk_000/score_consistency: Subprocess pipeline complete (0.2s)
+[11:44:19] [VALIDATE] chunk_000: Writing unit 10/11 (Last 10 took 0.00s)
+[11:44:19] [VALIDATE] chunk_000/score_consistency: Validation complete: 10 valid, 1 failed
+[11:44:19] [VALIDATE] chunk_000/score_consistency: 1 non-JSON responses categorized as pipeline_internal
+[11:44:21] [VALIDATE] retry/score_consistency: Starting validation of 1 units (timeout=600s)
+[11:44:21] [VALIDATE] retry/score_consistency: Running schema validation...
+[11:44:21] [VALIDATE] retry/score_consistency: Schema validation complete: 1 passed, 0 failed (0.1s)
+[11:44:21] [VALIDATE] retry/score_consistency: Running business logic validation on 1 records (599s remaining)...
+[11:44:21] [VALIDATE] retry/score_consistency: Subprocess pipeline complete (0.2s)
+[11:44:21] [VALIDATE] retry/score_consistency: Validation complete: 1 valid, 0 failed
+[11:44:19] score_consistency: 10/12 valid (30.2s) | 14,056 tokens | $0.0034
+[11:44:21] score_consistency retry 1/5: 1/1 valid | 1,102 tokens | $0.0003
+[11:44:21] [POST-PROCESS] Running: Tone Distribution by NPC...
+[11:44:21] [POST-PROCESS] Tone Distribution by NPC: Output written to runs/it_20260325-113335_npc_gemini_rt/tone_distribution.txt
+[11:44:21] [POST-PROCESS] Tone Distribution by NPC: Loading results from runs/it_20260325-113335_npc_gemini_rt...
+[11:44:21] [POST-PROCESS] Tone Distribution by NPC: Reading final step 'score_consistency' results...
+[11:44:21] [POST-PROCESS] Tone Distribution by NPC: Loaded 11 results
+[11:44:21] [POST-PROCESS] Running: Personality Consistency Scores...
+[11:44:21] [POST-PROCESS] Personality Consistency Scores: Output written to runs/it_20260325-113335_npc_gemini_rt/personality_scores.txt
+[11:44:21] [POST-PROCESS] Personality Consistency Scores: Loading results from runs/it_20260325-113335_npc_gemini_rt...
+[11:44:21] [POST-PROCESS] Personality Consistency Scores: Reading final step 'score_consistency' results...
+[11:44:21] [POST-PROCESS] Personality Consistency Scores: Loaded 11 results
+[11:44:21] [POST-PROCESS] Running: Mood Responsiveness Scores...
+[11:44:21] [POST-PROCESS] Mood Responsiveness Scores: Output written to runs/it_20260325-113335_npc_gemini_rt/mood_scores.txt
+[11:44:21] [POST-PROCESS] Mood Responsiveness Scores: Loading results from runs/it_20260325-113335_npc_gemini_rt...
+[11:44:21] [POST-PROCESS] Mood Responsiveness Scores: Reading final step 'score_consistency' results...
+[11:44:21] [POST-PROCESS] Mood Responsiveness Scores: Loaded 11 results
+[11:44:21] [POST-PROCESS] Running: Retry Analysis...
+[11:44:21] [POST-PROCESS] Retry Analysis: Output written to runs/it_20260325-113335_npc_gemini_rt/retry_analysis.txt
+[11:44:21] [POST-PROCESS] Running: Results CSV...
+[11:44:21] [POST-PROCESS] Results CSV: Output written to runs/it_20260325-113335_npc_gemini_rt/results.csv
+[11:44:21] [POST-PROCESS] Results CSV: Loading results from runs/it_20260325-113335_npc_gemini_rt...
+[11:44:21] [POST-PROCESS] Results CSV: Reading final step 'score_consistency' results...
+[11:44:21] [POST-PROCESS] Results CSV: Loaded 11 results
+[11:44:21] [REALTIME] Complete: 23 valid, 1 retried, 1 failed, cost=$0.0059
+[11:44:21] [COMPLETE] Run completed successfully
+[11:44:21] Pipeline complete: 23 valid, 1 retried, 1 failed
+[11:44:21] Total: 22,023 tokens (16,333 in + 5,690 out) | $0.0059

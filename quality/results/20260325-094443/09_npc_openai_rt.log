@@ -1,0 +1,92 @@
+[09:52:36] [INIT] Starting new run
+[09:52:36] [INIT] Command: ./scripts/orchestrate.py --init --pipeline NPCDialog --run-dir ./runs/it_20260325-094443_npc_openai_rt --realtime --provider openai --max-units 12 --yes
+[09:52:36] [INIT] Config: /Users/andrewstellman/Documents/Game/octobatch-awesome-copilot/pipelines/NPCDialog/config.yaml
+[09:52:36] [INIT] Provider override: openai
+[09:52:36] [INIT] Applied overrides: provider=openai, model=None
+[09:52:36] [INIT] Copied item source: items.yaml
+[09:52:36] [INIT] Copied templates directory: templates
+[09:52:36] [INIT] Copied schemas directory: schemas
+[09:52:36] [INIT] Config snapshot saved to run directory
+[09:52:37] [INIT] Generated 12 units (cross_product: 3 groups)
+[09:52:37] [INIT] Created 1 chunks (chunk_size=60)
+[09:52:37] [INIT] Pipeline: generate_dialog -> score_consistency
+[09:52:37] [INIT] Run initialized successfully
+[09:52:37] [REALTIME] OpenAI API key: AVAILABLE
+[09:52:37] [REALTIME] Starting real-time execution
+[09:52:37] [REALTIME] Running generate_dialog with openai/gpt-4o-mini (default)
+Run initialized: runs/it_20260325-094443_npc_openai_rt
+  Units: 12
+  Chunks: 1
+  Pipeline: generate_dialog -> score_consistency
+[09:52:37] Real-time mode (2x cost)
+[09:52:37] Running generate_dialog with openai/gpt-4o-mini (default)
+[09:52:37] Running generate_dialog (12 units)...
+[09:52:42] [1/12] gruff_blacksmith-friendly-directions ✓ | 495 tokens | $0.0001 | ~50s left
+[09:52:46] [2/12] gruff_blacksmith-friendly-bartering ✓ | 1,028 tokens | $0.0003 | ~45s left
+[09:52:51] [3/12] gruff_blacksmith-friendly-quest_info ✓ | 1,576 tokens | $0.0005 | ~42s left
+[09:52:55] [4/12] gruff_blacksmith-aggressive-directions ✓ | 2,083 tokens | $0.0006 | ~35s left
+[09:52:59] [5/12] gruff_blacksmith-aggressive-bartering ✓ | 2,588 tokens | $0.0008 | ~30s left
+[09:53:03] [6/12] gruff_blacksmith-aggressive-quest_info ✓ | 3,110 tokens | $0.0009 | ~26s left
+[09:53:08] [7/12] gruff_blacksmith-desperate-directions ✓ | 3,635 tokens | $0.0011 | ~22s left
+[09:53:13] [8/12] gruff_blacksmith-desperate-bartering ✓ | 4,163 tokens | $0.0013 | ~18s left
+[09:53:17] [9/12] gruff_blacksmith-desperate-quest_info ✓ | 4,665 tokens | $0.0014 | ~13s left
+[09:53:21] [10/12] gruff_blacksmith-suspicious-directions ✓ | 5,155 tokens | $0.0016 | ~8s left
+[09:53:25] [11/12] gruff_blacksmith-suspicious-bartering ✓ | 5,694 tokens | $0.0017 | ~4s left
+[09:53:30] [12/12] gruff_blacksmith-suspicious-quest_info ✓ | 6,243 tokens | $0.0019
+[09:53:30] [VALIDATE] chunk_000/generate_dialog: Starting validation of 12 units (timeout=600s)
+[09:53:30] [VALIDATE] chunk_000/generate_dialog: Running schema validation...
+[09:53:30] [VALIDATE] chunk_000/generate_dialog: Schema validation complete: 12 passed, 0 failed (0.1s)
+[09:53:30] [VALIDATE] chunk_000/generate_dialog: Running business logic validation on 12 records (599s remaining)...
+[09:53:30] [VALIDATE] chunk_000/generate_dialog: Subprocess pipeline complete (0.2s)
+[09:53:30] [VALIDATE] chunk_000: Writing unit 10/12 (Last 10 took 0.00s)
+[09:53:30] [VALIDATE] chunk_000/generate_dialog: Validation complete: 12 valid, 0 failed
+[09:53:30] [REALTIME] Running score_consistency with openai/gpt-4o-mini (default)
+[09:53:30] generate_dialog: 12/12 valid (53.3s) | 6,243 tokens | $0.0019
+[09:53:30] Running score_consistency with openai/gpt-4o-mini (default)
+[09:53:30] Running score_consistency (12 units)...
+[09:53:35] [1/12] gruff_blacksmith-friendly-directions ✓ | 1,078 tokens | $0.0003 | ~55s left
+[09:53:40] [2/12] gruff_blacksmith-friendly-bartering ✓ | 2,182 tokens | $0.0005 | ~48s left
+[09:53:44] [3/12] gruff_blacksmith-friendly-quest_info ✓ | 3,273 tokens | $0.0008 | ~40s left
+[09:53:49] [4/12] gruff_blacksmith-aggressive-directions ✓ | 4,335 tokens | $0.0010 | ~36s left
+[09:53:53] [5/12] gruff_blacksmith-aggressive-bartering ✓ | 5,375 tokens | $0.0013 | ~31s left
+[09:53:57] [6/12] gruff_blacksmith-aggressive-quest_info ✓ | 6,474 tokens | $0.0015 | ~26s left
+[09:54:04] [7/12] gruff_blacksmith-desperate-directions ✓ | 7,579 tokens | $0.0018 | ~24s left
+[09:54:10] [8/12] gruff_blacksmith-desperate-bartering ✓ | 8,701 tokens | $0.0021 | ~19s left
+[09:54:14] [9/12] gruff_blacksmith-desperate-quest_info ✓ | 9,778 tokens | $0.0023 | ~14s left
+[09:54:19] [10/12] gruff_blacksmith-suspicious-directions ✓ | 10,806 tokens | $0.0026 | ~9s left
+[09:54:23] [11/12] gruff_blacksmith-suspicious-bartering ✓ | 11,892 tokens | $0.0028 | ~4s left
+[09:54:28] [12/12] gruff_blacksmith-suspicious-quest_info ✓ | 13,001 tokens | $0.0031
+[09:54:28] [VALIDATE] chunk_000/score_consistency: Starting validation of 12 units (timeout=600s)
+[09:54:28] [VALIDATE] chunk_000/score_consistency: Running schema validation...
+[09:54:28] [VALIDATE] chunk_000/score_consistency: Schema validation complete: 12 passed, 0 failed (0.3s)
+[09:54:28] [VALIDATE] chunk_000/score_consistency: Running business logic validation on 12 records (599s remaining)...
+[09:54:28] [VALIDATE] chunk_000/score_consistency: Subprocess pipeline complete (0.4s)
+[09:54:28] [VALIDATE] chunk_000: Writing unit 10/12 (Last 10 took 0.00s)
+[09:54:28] [VALIDATE] chunk_000/score_consistency: Validation complete: 12 valid, 0 failed
+[09:54:28] [POST-PROCESS] Running: Tone Distribution by NPC...
+[09:54:28] [POST-PROCESS] Tone Distribution by NPC: Output written to runs/it_20260325-094443_npc_openai_rt/tone_distribution.txt
+[09:54:28] [POST-PROCESS] Tone Distribution by NPC: Loading results from runs/it_20260325-094443_npc_openai_rt...
+[09:54:28] [POST-PROCESS] Tone Distribution by NPC: Reading final step 'score_consistency' results...
+[09:54:28] [POST-PROCESS] Tone Distribution by NPC: Loaded 12 results
+[09:54:28] [POST-PROCESS] Running: Personality Consistency Scores...
+[09:54:28] [POST-PROCESS] Personality Consistency Scores: Output written to runs/it_20260325-094443_npc_openai_rt/personality_scores.txt
+[09:54:28] [POST-PROCESS] Personality Consistency Scores: Loading results from runs/it_20260325-094443_npc_openai_rt...
+[09:54:28] [POST-PROCESS] Personality Consistency Scores: Reading final step 'score_consistency' results...
+[09:54:28] [POST-PROCESS] Personality Consistency Scores: Loaded 12 results
+[09:54:28] [POST-PROCESS] Running: Mood Responsiveness Scores...
+[09:54:28] [POST-PROCESS] Mood Responsiveness Scores: Output written to runs/it_20260325-094443_npc_openai_rt/mood_scores.txt
+[09:54:28] [POST-PROCESS] Mood Responsiveness Scores: Loading results from runs/it_20260325-094443_npc_openai_rt...
+[09:54:28] [POST-PROCESS] Mood Responsiveness Scores: Reading final step 'score_consistency' results...
+[09:54:28] [POST-PROCESS] Mood Responsiveness Scores: Loaded 12 results
+[09:54:28] [POST-PROCESS] Running: Retry Analysis...
+[09:54:28] [POST-PROCESS] Retry Analysis: Output written to runs/it_20260325-094443_npc_openai_rt/retry_analysis.txt
+[09:54:28] [POST-PROCESS] Running: Results CSV...
+[09:54:28] [POST-PROCESS] Results CSV: Output written to runs/it_20260325-094443_npc_openai_rt/results.csv
+[09:54:28] [POST-PROCESS] Results CSV: Loading results from runs/it_20260325-094443_npc_openai_rt...
+[09:54:28] [POST-PROCESS] Results CSV: Reading final step 'score_consistency' results...
+[09:54:28] [POST-PROCESS] Results CSV: Loaded 12 results
+[09:54:28] [REALTIME] Complete: 24 valid, 0 retried, 0 failed, cost=$0.0050
+[09:54:28] [COMPLETE] Run completed successfully
+[09:54:28] score_consistency: 12/12 valid (57.5s) | 13,001 tokens | $0.0031
+[09:54:28] Pipeline complete: 24 valid, 0 failed
+[09:54:28] Total: 19,244 tokens (14,576 in + 4,668 out) | $0.0050

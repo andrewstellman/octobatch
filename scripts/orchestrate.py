@@ -500,7 +500,7 @@ def run_post_process(run_dir: Path, config: dict) -> None:
             log_message(log_file, "POST-PROCESS", f"{name}: Error: {e}")
 
 
-def check_prerequisites(config: dict | None = None) -> str | None:
+def check_prerequisites(config: dict | None = None, manifest: dict | None = None) -> str | None:
     """
     Check required environment variables before starting.
 
@@ -509,6 +509,7 @@ def check_prerequisites(config: dict | None = None) -> str | None:
 
     Args:
         config: Optional config dict to determine provider
+        manifest: Optional manifest dict to honor CLI override metadata
 
     Returns:
         Error message string if prerequisites not met, None if OK
@@ -523,17 +524,25 @@ def check_prerequisites(config: dict | None = None) -> str | None:
     needed_providers = set()
 
     if config:
-        # Global api.provider
-        global_provider = config.get("api", {}).get("provider")
-        if global_provider:
-            needed_providers.add(global_provider.lower())
+        metadata = manifest.get("metadata", {}) if manifest else {}
+        cli_provider_override = bool(metadata.get("cli_provider_override"))
 
-        # Per-step providers
-        steps = config.get("pipeline", {}).get("steps", [])
-        for step in steps:
-            step_provider = step.get("provider")
-            if step_provider:
-                needed_providers.add(step_provider.lower())
+        if cli_provider_override:
+            overridden_provider = config.get("api", {}).get("provider")
+            if overridden_provider:
+                needed_providers.add(overridden_provider.lower())
+        else:
+            # Global api.provider
+            global_provider = config.get("api", {}).get("provider")
+            if global_provider:
+                needed_providers.add(global_provider.lower())
+
+            # Per-step providers
+            steps = config.get("pipeline", {}).get("steps", [])
+            for step in steps:
+                step_provider = step.get("provider")
+                if step_provider:
+                    needed_providers.add(step_provider.lower())
 
     # If no provider specified anywhere, check the registry default
     if not needed_providers:
@@ -682,6 +691,68 @@ def build_failures_map(run_dir: Path, manifest: dict) -> dict:
     return failures
 
 
+def is_retryable_failure_stage(stage: str | None) -> bool:
+    """Return True when a failure stage is eligible for retry."""
+    return (stage or "validation") in {"schema_validation", "validation"}
+
+
+def failures_file_has_retryable_records(failures_file: Path) -> bool:
+    """Return True when a failures file contains any retryable record."""
+    if not failures_file.exists() or failures_file.stat().st_size == 0:
+        return False
+
+    try:
+        with open(failures_file) as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    failure = json.loads(line)
+                except json.JSONDecodeError:
+                    continue
+                if is_retryable_failure_stage(failure.get("failure_stage")):
+                    return True
+    except OSError:
+        return False
+
+    return False
+
+
+def mark_failed_chunks_without_retryable_failures_terminal(
+    run_dir: Path,
+    manifest: dict,
+    pipeline: list[str],
+    log_file: Path,
+    max_retries: int,
+) -> bool:
+    """Mark FAILED chunks terminal once only hard failures remain."""
+    chunks_dir = run_dir / "chunks"
+    patched_any = False
+
+    for chunk_name, chunk_data in manifest.get("chunks", {}).items():
+        if chunk_data.get("state") != "FAILED":
+            continue
+
+        retries = chunk_data.get("retries", chunk_data.get("retry_count", 0))
+        if retries >= max_retries:
+            continue
+
+        chunk_dir = chunks_dir / chunk_name
+        has_retryable = any(
+            failures_file_has_retryable_records(chunk_dir / f"{step}_failures.jsonl")
+            for step in pipeline
+        )
+        if has_retryable:
+            continue
+
+        chunk_data["retries"] = max_retries
+        log_message(log_file, "STOP", f"{chunk_name}: FAILED with no retryable failures remaining. Marking terminal.")
+        patched_any = True
+
+    return patched_any
+
+
 def parse_state(state: str) -> tuple[str, str]:
     """
     Parse a chunk state into (step, status).
@@ -804,7 +875,6 @@ def categorize_step_failures(run_dir: Path, step_name: str) -> dict:
     Returns:
         {"validation": count, "hard": count, "total": count}
     """
-    validation_stages = {"schema_validation", "validation"}
     chunks_dir = run_dir / "chunks"
     validation = 0
     hard = 0
@@ -825,8 +895,7 @@ def categorize_step_failures(run_dir: Path, step_name: str) -> dict:
                         continue
                     try:
                         failure = json.loads(line)
-                        stage = failure.get("failure_stage", "validation")
-                        if stage in validation_stages:
+                        if is_retryable_failure_stage(failure.get("failure_stage")):
                             validation += 1
                         else:
                             hard += 1
@@ -854,7 +923,6 @@ def mark_expression_failures_exhausted(
     if not failures_file.exists():
         return 0
 
-    validation_stages = {"schema_validation", "validation"}
     updated = 0
     records = []
 
@@ -870,9 +938,8 @@ def mark_expression_failures_exhausted(
                     records.append(line_s)
                     continue
 
-                stage = failure.get("failure_stage", "validation")
                 retry_count = failure.get("retry_count", 0)
-                if stage in validation_stages and retry_count < max_retries:
+                if is_retryable_failure_stage(failure.get("failure_stage")) and retry_count < max_retries:
                     failure["retry_count"] = max_retries
                     updated += 1
                 records.append(json.dumps(failure))
@@ -3960,6 +4027,8 @@ def watch_run(
         - 3: Timeout exceeded
         - 130: User interrupted (Ctrl+C)
     """
+    manifest = load_manifest(run_dir)
+
     # Load config for prerequisite check
     _watch_config = None
     _watch_config_path = run_dir / "config" / "config.yaml"
@@ -3968,7 +4037,7 @@ def watch_run(
             _watch_config = yaml.safe_load(f)
 
     # Check prerequisites early
-    prereq_error = check_prerequisites(_watch_config)
+    prereq_error = check_prerequisites(_watch_config, manifest)
     if prereq_error:
         print(f"Error: {prereq_error}", file=sys.stderr)
         mark_run_failed(run_dir, prereq_error, log_traceback=False)
@@ -3991,27 +4060,14 @@ def watch_run(
         # retry chunks. Without this, is_run_terminal() sees retries=0 < max_retries
         # and thinks retries remain, causing the watch loop to tick forever.
         chunks = manifest.get("chunks", {})
-        chunks_dir = run_dir / "chunks"
         pipeline = manifest.get("pipeline", [])
-        patched_any = False
-        for chunk_name, chunk_data in chunks.items():
-            if chunk_data.get("state") != "FAILED":
-                continue
-            retries = chunk_data.get("retries", chunk_data.get("retry_count", 0))
-            if retries >= max_retries:
-                continue  # Already terminal
-            # Check if any retryable failure files exist for this chunk
-            chunk_dir = chunks_dir / chunk_name
-            has_retryable = False
-            for step in pipeline:
-                failures_file = chunk_dir / f"{step}_failures.jsonl"
-                if failures_file.exists() and failures_file.stat().st_size > 0:
-                    has_retryable = True
-                    break
-            if not has_retryable:
-                chunk_data["retries"] = max_retries
-                log_message(log_file, "STOP", f"{chunk_name}: FAILED with no retryable failures remaining. Marking terminal.")
-                patched_any = True
+        patched_any = mark_failed_chunks_without_retryable_failures_terminal(
+            run_dir,
+            manifest,
+            pipeline,
+            log_file,
+            max_retries,
+        )
         if patched_any:
             save_manifest(run_dir, manifest)
 
@@ -4375,8 +4431,8 @@ def run_expression_step(
                     expr_results = evaluate_expressions(expressions, output_unit, rng)
                     output_unit.update(expr_results)
 
-                    # Check loop condition (no randomness needed for condition check)
-                    if evaluate_condition(loop_until_expr, output_unit):
+                    # Keep loop_until on the same seeded RNG stream as the expressions.
+                    if evaluate_condition(loop_until_expr, output_unit, rng):
                         condition_met = True
                         break
 
@@ -5032,7 +5088,7 @@ def run_realtime_retries(
                 retry_count = failure.get("retry_count", 0)
 
                 # Check if retryable
-                if retry_count >= max_retries:
+                if retry_count >= max_retries or not is_retryable_failure_stage(failure.get("failure_stage")):
                     continue
 
                 # Get input data
@@ -5296,10 +5352,7 @@ def run_realtime_retries(
             1 for uid in validated_units
             if retryable_failures.get(uid, {}).get("chunk_name") == chunk_name
         )
-        chunk_data["failed"] = len([
-            f for f in remaining_failures
-            if f.get("unit_id") in retryable_failures
-        ])
+        chunk_data["failed"] = len(remaining_failures)
 
     # Clean up temp files
     retry_units_file.unlink(missing_ok=True)
@@ -5333,6 +5386,8 @@ def realtime_run(
         print(f"Error: MANIFEST.json not found in {run_dir}", file=sys.stderr)
         return 1
 
+    manifest = load_manifest(run_dir)
+
     # Load config for prerequisite check
     _rt_config = None
     _rt_config_path = run_dir / "config" / "config.yaml"
@@ -5341,7 +5396,7 @@ def realtime_run(
             _rt_config = yaml.safe_load(f)
 
     # Check prerequisites early
-    prereq_error = check_prerequisites(_rt_config)
+    prereq_error = check_prerequisites(_rt_config, manifest)
     if prereq_error:
         print(f"Error: {prereq_error}", file=sys.stderr)
         mark_run_failed(run_dir, prereq_error, log_traceback=False)
@@ -5356,8 +5411,7 @@ def realtime_run(
     write_pid_file(run_dir)
     atexit.register(cleanup_pid_file, run_dir)
 
-    # Load manifest and config
-    manifest = load_manifest(run_dir)
+    # Load config snapshot
     pipeline = manifest["pipeline"]
     chunks = manifest["chunks"]
 
@@ -5388,25 +5442,13 @@ def realtime_run(
 
     # Mark FAILED chunks as exhausted if they have no retryable failure files.
     # (See watch_run() for detailed explanation of why this is needed.)
-    chunks_dir = run_dir / "chunks"
-    patched_any = False
-    for chunk_name, chunk_data in chunks.items():
-        if chunk_data.get("state") != "FAILED":
-            continue
-        retries = chunk_data.get("retries", chunk_data.get("retry_count", 0))
-        if retries >= max_retries:
-            continue
-        chunk_dir = chunks_dir / chunk_name
-        has_retryable = False
-        for step in pipeline:
-            failures_file = chunk_dir / f"{step}_failures.jsonl"
-            if failures_file.exists() and failures_file.stat().st_size > 0:
-                has_retryable = True
-                break
-        if not has_retryable:
-            chunk_data["retries"] = max_retries
-            log_message(log_file, "STOP", f"{chunk_name}: FAILED with no retryable failures remaining. Marking terminal.")
-            patched_any = True
+    patched_any = mark_failed_chunks_without_retryable_failures_terminal(
+        run_dir,
+        manifest,
+        pipeline,
+        log_file,
+        max_retries,
+    )
     if patched_any:
         save_manifest(run_dir, manifest)
 
@@ -5469,8 +5511,9 @@ def realtime_run(
     print(f"[{time_str}] Real-time mode (2x cost)")
     log_message(log_file, "REALTIME", "Starting real-time execution")
 
-    # Reset retry counts for fresh retry attempts this invocation
-    # Each --realtime run gets a fresh set of retries
+    # Reset retry counts for fresh retry attempts this invocation.
+    # See specs/VALIDATION.md § Retry Count Tracking: retry budgets are per
+    # --realtime invocation, not durable across separate invocations.
     chunks_dir = run_dir / "chunks"
     for chunk_name in chunks:
         chunk_dir = chunks_dir / chunk_name
@@ -5971,24 +6014,14 @@ def realtime_run(
             # 1. Chunks with 0 valid units (complete failure, no point retrying)
             # 2. Chunks whose units were rescued by retry chunks (failure files
             #    consumed, but original chunk still marked FAILED)
-            for chunk_name, chunk_data in chunks.items():
-                if chunk_data.get("state") != "FAILED":
-                    continue
-                chunk_retries = chunk_data.get("retries", chunk_data.get("retry_count", 0))
-                if chunk_retries >= max_retries:
-                    continue
-                # Check if any retryable failure files exist
-                chunk_dir = run_dir / "chunks" / chunk_name
-                has_retryable = False
-                for step in pipeline:
-                    failures_file = chunk_dir / f"{step}_failures.jsonl"
-                    if failures_file.exists() and failures_file.stat().st_size > 0:
-                        has_retryable = True
-                        break
-                if not has_retryable:
-                    chunk_data["retries"] = max_retries
-                    log_message(log_file, "STOP", f"{chunk_name}: FAILED with no retryable failures remaining. Marking terminal.")
-                    save_manifest(run_dir, manifest)
+            if mark_failed_chunks_without_retryable_failures_terminal(
+                run_dir,
+                manifest,
+                pipeline,
+                log_file,
+                max_retries,
+            ):
+                save_manifest(run_dir, manifest)
 
             # Break step loop if cost cap reached during retries
             if cost_cap_reached:

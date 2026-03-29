@@ -13,7 +13,7 @@ import time
 from typing import TYPE_CHECKING
 
 # Import error types from provider base
-from scripts.providers.base import ProviderError, RateLimitError
+from scripts.providers.base import AuthenticationError, ProviderError, RateLimitError
 
 # Import shared utility
 from scripts.octobatch_utils import parse_json_response
@@ -88,6 +88,8 @@ def run_realtime(
                     # Exponential backoff for rate limits
                     time.sleep(backoff)
                     backoff *= backoff_multiplier
+            except AuthenticationError as e:
+                raise FatalProviderError(f"Fatal provider authentication error: {e}") from e
             except ProviderError as e:
                 # Check if it's a transient error that should be retried
                 error_str = str(e).lower()

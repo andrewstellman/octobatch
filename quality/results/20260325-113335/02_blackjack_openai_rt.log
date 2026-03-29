@@ -1,0 +1,186 @@
+[11:34:05] [INIT] Starting new run
+[11:34:05] [INIT] Command: ./scripts/orchestrate.py --init --pipeline Blackjack --run-dir ./runs/it_20260325-113335_blackjack_openai_rt --realtime --provider openai --max-units 15 --yes
+[11:34:05] [INIT] Config: /Users/andrewstellman/Documents/Game/octobatch-awesome-copilot/pipelines/Blackjack/config.yaml
+[11:34:05] [INIT] Provider override: openai
+[11:34:05] [INIT] Applied overrides: provider=openai, model=None
+[11:34:05] [INIT] Copied item source: items.yaml
+[11:34:05] [INIT] Copied templates directory: templates
+[11:34:05] [INIT] Copied schemas directory: schemas
+[11:34:05] [INIT] Config snapshot saved to run directory
+[11:34:05] [INIT] Generated 15 units (3 base × 300 repetitions, limited from 900)
+[11:34:05] [INIT] Created 1 chunks (chunk_size=100)
+[11:34:05] [INIT] Pipeline: deal_cards -> play_hand -> verify_hand -> verify_strategy -> analyze_difficulty
+[11:34:05] [INIT] Run initialized successfully
+[11:34:05] [REALTIME] OpenAI API key: AVAILABLE
+[11:34:06] [REALTIME] Starting real-time execution
+[11:34:06] [REALTIME] Running deal_cards with openai/gpt-4o-mini (default)
+Run initialized: runs/it_20260325-113335_blackjack_openai_rt
+  Units: 15
+  Chunks: 1
+  Pipeline: deal_cards -> play_hand -> verify_hand -> verify_strategy -> analyze_difficulty
+[11:34:06] Real-time mode (2x cost)
+[11:34:06] Running deal_cards with openai/gpt-4o-mini (default)
+[11:34:06] Running deal_cards (15 units)...
+[11:34:06] [1/15] the_pro__rep0000 ✓
+[11:34:06] [2/15] the_gambler__rep0000 ✓
+[11:34:06] [3/15] the_coward__rep0000 ✓
+[11:34:06] [4/15] the_pro__rep0001 ✓
+[11:34:06] [5/15] the_gambler__rep0001 ✓
+[11:34:06] [6/15] the_coward__rep0001 ✓
+[11:34:06] [7/15] the_pro__rep0002 ✓
+[11:34:06] [8/15] the_gambler__rep0002 ✓
+[11:34:06] [9/15] the_coward__rep0002 ✓
+[11:34:06] [10/15] the_pro__rep0003 ✓
+[11:34:06] [11/15] the_gambler__rep0003 ✓
+[11:34:06] [12/15] the_coward__rep0003 ✓
+[11:34:06] [13/15] the_pro__rep0004 ✓
+[11:34:06] [14/15] the_gambler__rep0004 ✓
+[11:34:06] [15/15] the_coward__rep0004 ✓
+[11:34:06] [REALTIME] Running play_hand with openai/gpt-4o-mini (default)
+[11:34:06] deal_cards: 15/15 valid (0.0s) | 0 tokens | $0.0000
+[11:34:06] Running play_hand with openai/gpt-4o-mini (default)
+[11:34:06] Running play_hand (15 units)...
+[11:34:11] [1/15] the_pro__rep0000 ✓ | 1,636 tokens | $0.0003 | ~1m 11s left
+[11:34:16] [2/15] the_gambler__rep0000 ✓ | 3,213 tokens | $0.0006 | ~1m 7s left
+[11:34:22] [3/15] the_coward__rep0000 ✓ | 4,782 tokens | $0.0010 | ~1m 3s left
+[11:34:28] [4/15] the_pro__rep0001 ✓ | 6,403 tokens | $0.0013 | ~59s left
+[11:34:34] [5/15] the_gambler__rep0001 ✓ | 8,059 tokens | $0.0016 | ~55s left
+[11:34:39] [6/15] the_coward__rep0001 ✓ | 9,612 tokens | $0.0019 | ~48s left
+[11:34:44] [7/15] the_pro__rep0002 ✓ | 11,254 tokens | $0.0023 | ~43s left
+[11:34:49] [8/15] the_gambler__rep0002 ✓ | 12,886 tokens | $0.0026 | ~37s left
+[11:34:54] [9/15] the_coward__rep0002 ✓ | 14,507 tokens | $0.0030 | ~32s left
+[11:35:02] [10/15] the_pro__rep0003 ✓ | 16,207 tokens | $0.0033 | ~27s left
+[11:35:06] [11/15] the_gambler__rep0003 ✓ | 17,784 tokens | $0.0036 | ~21s left
+[11:35:10] [12/15] the_coward__rep0003 ✓ | 19,340 tokens | $0.0040 | ~15s left
+[11:35:17] [13/15] the_pro__rep0004 ✓ | 21,024 tokens | $0.0043 | ~10s left
+[11:35:21] [14/15] the_gambler__rep0004 ✓ | 22,604 tokens | $0.0046 | ~5s left
+[11:35:24] [15/15] the_coward__rep0004 ✓ | 24,141 tokens | $0.0049
+[11:35:24] [VALIDATE] chunk_000/play_hand: Starting validation of 15 units (timeout=600s)
+[11:35:24] [VALIDATE] chunk_000/play_hand: Running schema validation...
+[11:35:25] [VALIDATE] chunk_000/play_hand: Schema validation complete: 11 passed, 4 failed (0.2s)
+[11:35:25] [VALIDATE] chunk_000/play_hand: Running business logic validation on 11 records (599s remaining)...
+[11:35:25] [VALIDATE] chunk_000/play_hand: Subprocess pipeline complete (0.3s)
+[11:35:25] [VALIDATE] chunk_000: Writing unit 10/15 (Last 10 took 0.00s)
+[11:35:25] [VALIDATE] chunk_000/play_hand: Validation complete: 11 valid, 4 failed
+[11:35:49] [VALIDATE] retry/play_hand: Starting validation of 4 units (timeout=600s)
+[11:35:49] [VALIDATE] retry/play_hand: Running schema validation...
+[11:35:49] [VALIDATE] retry/play_hand: Schema validation complete: 2 passed, 2 failed (0.2s)
+[11:35:49] [VALIDATE] retry/play_hand: Running business logic validation on 2 records (599s remaining)...
+[11:35:49] [VALIDATE] retry/play_hand: Subprocess pipeline complete (0.3s)
+[11:35:49] [VALIDATE] retry/play_hand: Validation complete: 2 valid, 2 failed
+[11:35:25] play_hand: 11/15 valid (78.6s) | 24,141 tokens | $0.0049
+[11:35:49] play_hand retry 1/5: 2/4 valid | 6,579 tokens | $0.0014
+[11:36:00] [VALIDATE] retry/play_hand: Starting validation of 2 units (timeout=600s)
+[11:36:00] [VALIDATE] retry/play_hand: Running schema validation...
+[11:36:00] [VALIDATE] retry/play_hand: Schema validation complete: 1 passed, 1 failed (0.1s)
+[11:36:00] [VALIDATE] retry/play_hand: Running business logic validation on 1 records (599s remaining)...
+[11:36:00] [VALIDATE] retry/play_hand: Subprocess pipeline complete (0.2s)
+[11:36:00] [VALIDATE] retry/play_hand: Validation complete: 1 valid, 1 failed
+[11:36:00] play_hand retry 2/5: 1/2 valid | 3,369 tokens | $0.0007
+[11:36:06] [VALIDATE] retry/play_hand: Starting validation of 1 units (timeout=600s)
+[11:36:06] [VALIDATE] retry/play_hand: Running schema validation...
+[11:36:06] [VALIDATE] retry/play_hand: Schema validation complete: 0 passed, 1 failed (0.1s)
+[11:36:06] [VALIDATE] retry/play_hand: Running business logic validation on 0 records (599s remaining)...
+[11:36:06] [VALIDATE] retry/play_hand: Subprocess pipeline complete (0.2s)
+[11:36:06] [VALIDATE] retry/play_hand: Validation complete: 0 valid, 1 failed
+[11:36:06] play_hand retry 3/5: 0/1 valid | 1,693 tokens | $0.0004
+[11:36:14] [VALIDATE] retry/play_hand: Starting validation of 1 units (timeout=600s)
+[11:36:14] [VALIDATE] retry/play_hand: Running schema validation...
+[11:36:14] [VALIDATE] retry/play_hand: Schema validation complete: 1 passed, 0 failed (0.1s)
+[11:36:14] [VALIDATE] retry/play_hand: Running business logic validation on 1 records (599s remaining)...
+[11:36:14] [VALIDATE] retry/play_hand: Subprocess pipeline complete (0.2s)
+[11:36:14] [VALIDATE] retry/play_hand: Validation complete: 1 valid, 0 failed
+[11:36:14] play_hand retry 4/5: 1/1 valid | 1,700 tokens | $0.0004
+[11:36:14] [REALTIME] Running verify_hand with openai/gpt-4o-mini (default)
+[11:36:14] Running verify_hand with openai/gpt-4o-mini (default)
+[11:36:14] Running verify_hand (15 units)...
+[11:36:14] [1/15] the_pro__rep0000 ✓
+[11:36:14] [2/15] the_gambler__rep0000 ✓
+[11:36:14] [3/15] the_coward__rep0000 ✓
+[11:36:14] [4/15] the_pro__rep0001 ✓
+[11:36:14] [5/15] the_coward__rep0001 ✓
+[11:36:14] [6/15] the_pro__rep0002 ✓
+[11:36:14] [7/15] the_gambler__rep0002 ✓
+[11:36:14] [8/15] the_coward__rep0003 ✓
+[11:36:14] [9/15] the_pro__rep0004 ✓
+[11:36:14] [10/15] the_gambler__rep0004 ✓
+[11:36:14] [11/15] the_coward__rep0004 ✓
+[11:36:14] [12/15] the_coward__rep0002 ✓
+[11:36:14] [13/15] the_gambler__rep0003 ✓
+[11:36:14] [14/15] the_gambler__rep0001 ✓
+[11:36:14] [15/15] the_pro__rep0003 ✓
+[11:36:14] [EXPRESSION] chunk_000: Running validation for expression step 'verify_hand'
+[11:36:14] [VALIDATE] chunk_000/verify_hand: Starting validation of 15 units (timeout=600s)
+[11:36:14] [VALIDATE] chunk_000/verify_hand: Running business logic validation (no schema)...
+[11:36:14] [VALIDATE] chunk_000/verify_hand: Subprocess pipeline complete (0.1s)
+[11:36:14] [VALIDATE] chunk_000: Writing unit 10/15 (Last 10 took 0.00s)
+[11:36:14] [VALIDATE] chunk_000/verify_hand: Validation complete: 13 valid, 2 failed
+[11:36:14] [EXPRESSION] chunk_000: Marked 2 validation failures as exhausted for expression step 'verify_hand'
+[11:36:15] [REALTIME] Running verify_strategy with openai/gpt-4o-mini (default)
+[11:36:14] verify_hand: 13/15 valid (0.1s) | 0 tokens | $0.0000
+[11:36:15] Running verify_strategy with openai/gpt-4o-mini (default)
+[11:36:15] Running verify_strategy (15 units)...
+[11:36:15] [1/15] the_pro__rep0000 ✓
+[11:36:15] [2/15] the_gambler__rep0000 ✓
+[11:36:15] [3/15] the_coward__rep0000 ✓
+[11:36:15] [4/15] the_pro__rep0001 ✓
+[11:36:15] [5/15] the_coward__rep0001 ✓
+[11:36:15] [6/15] the_pro__rep0002 ✓
+[11:36:15] [7/15] the_coward__rep0003 ✓
+[11:36:15] [8/15] the_gambler__rep0004 ✓
+[11:36:15] [9/15] the_coward__rep0004 ✓
+[11:36:15] [10/15] the_coward__rep0002 ✓
+[11:36:15] [11/15] the_gambler__rep0003 ✓
+[11:36:15] [12/15] the_gambler__rep0001 ✓
+[11:36:15] [13/15] the_pro__rep0003 ✓
+[11:36:15] [EXPRESSION] chunk_000: Running validation for expression step 'verify_strategy'
+[11:36:15] [VALIDATE] chunk_000/verify_strategy: Starting validation of 13 units (timeout=600s)
+[11:36:15] [VALIDATE] chunk_000/verify_strategy: Running business logic validation (no schema)...
+[11:36:15] [VALIDATE] chunk_000/verify_strategy: Subprocess pipeline complete (0.1s)
+[11:36:15] [VALIDATE] chunk_000: Writing unit 10/13 (Last 10 took 0.00s)
+[11:36:15] [VALIDATE] chunk_000/verify_strategy: Validation complete: 12 valid, 1 failed
+[11:36:15] [EXPRESSION] chunk_000: Marked 1 validation failures as exhausted for expression step 'verify_strategy'
+[11:36:15] [REALTIME] Running analyze_difficulty with openai/gpt-4o-mini (default)
+[11:36:15] verify_strategy: 12/13 valid (0.1s) | 0 tokens | $0.0000
+[11:36:15] Running analyze_difficulty with openai/gpt-4o-mini (default)
+[11:36:15] Running analyze_difficulty (15 units)...
+[11:36:17] [1/15] the_pro__rep0000 ✓ | 543 tokens | $0.0001 | ~28s left
+[11:36:20] [2/15] the_gambler__rep0000 ✓ | 1,065 tokens | $0.0002 | ~33s left
+[11:36:23] [3/15] the_coward__rep0000 ✓ | 1,603 tokens | $0.0004 | ~34s left
+[11:36:25] [4/15] the_pro__rep0001 ✓ | 2,111 tokens | $0.0005 | ~29s left
+[11:36:28] [5/15] the_coward__rep0001 ✓ | 2,638 tokens | $0.0006 | ~27s left
+[11:36:31] [6/15] the_coward__rep0003 ✓ | 3,135 tokens | $0.0007 | ~23s left
+[11:36:34] [7/15] the_gambler__rep0004 ✓ | 3,657 tokens | $0.0008 | ~21s left
+[11:36:36] [8/15] the_coward__rep0004 ✓ | 4,141 tokens | $0.0009 | ~18s left
+[11:36:39] [9/15] the_coward__rep0002 ✓ | 4,735 tokens | $0.0011 | ~15s left
+[11:36:41] [10/15] the_gambler__rep0003 ✓ | 5,275 tokens | $0.0012 | ~13s left
+[11:36:45] [11/15] the_gambler__rep0001 ✓ | 5,872 tokens | $0.0013 | ~10s left
+[11:36:47] [12/15] the_pro__rep0003 ✓ | 6,451 tokens | $0.0015 | ~8s left
+[11:36:47] [VALIDATE] chunk_000/analyze_difficulty: Starting validation of 12 units (timeout=600s)
+[11:36:47] [VALIDATE] chunk_000/analyze_difficulty: Running schema validation...
+[11:36:47] [VALIDATE] chunk_000/analyze_difficulty: Schema validation complete: 12 passed, 0 failed (0.2s)
+[11:36:47] [VALIDATE] chunk_000/analyze_difficulty: Running business logic validation on 12 records (599s remaining)...
+[11:36:47] [VALIDATE] chunk_000/analyze_difficulty: Subprocess pipeline complete (0.3s)
+[11:36:47] [VALIDATE] chunk_000: Writing unit 10/12 (Last 10 took 0.00s)
+[11:36:47] [VALIDATE] chunk_000/analyze_difficulty: Validation complete: 12 valid, 0 failed
+[11:36:47] [POST-PROCESS] Running: Strategy Comparison...
+[11:36:47] [POST-PROCESS] Strategy Comparison: Output written to runs/it_20260325-113335_blackjack_openai_rt/strategy_comparison.txt
+[11:36:47] [POST-PROCESS] Strategy Comparison: Loading results from runs/it_20260325-113335_blackjack_openai_rt...
+[11:36:47] [POST-PROCESS] Strategy Comparison: Reading final step 'analyze_difficulty' results...
+[11:36:47] [POST-PROCESS] Strategy Comparison: Loaded 12 results
+[11:36:47] [POST-PROCESS] Running: Difficulty Analysis...
+[11:36:47] [POST-PROCESS] Difficulty Analysis: Output written to runs/it_20260325-113335_blackjack_openai_rt/difficulty_analysis.txt
+[11:36:47] [POST-PROCESS] Difficulty Analysis: Loading results from runs/it_20260325-113335_blackjack_openai_rt...
+[11:36:47] [POST-PROCESS] Difficulty Analysis: Reading final step 'analyze_difficulty' results...
+[11:36:47] [POST-PROCESS] Difficulty Analysis: Loaded 12 results
+[11:36:47] [POST-PROCESS] Running: Results CSV...
+[11:36:47] [POST-PROCESS] Results CSV: Output written to runs/it_20260325-113335_blackjack_openai_rt/results.csv
+[11:36:47] [POST-PROCESS] Results CSV: Loading results from runs/it_20260325-113335_blackjack_openai_rt...
+[11:36:47] [POST-PROCESS] Results CSV: Reading final step 'analyze_difficulty' results...
+[11:36:47] [POST-PROCESS] Results CSV: Loaded 12 results
+[11:36:47] [REALTIME] Complete: 67 valid, 4 retried, 3 failed, cost=$0.0092
+[11:36:48] [COMPLETE] Run completed successfully
+[11:36:47] analyze_difficulty: 12/12 valid (32.6s) | 6,451 tokens | $0.0015
+[11:36:47] [POST-PROCESS] Compress Raw Results: Compressed 5 file(s)
+[11:36:47] Pipeline complete: 67 valid, 4 retried, 3 failed
+[11:36:47] Total: 43,933 tokens (38,027 in + 5,906 out) | $0.0092
