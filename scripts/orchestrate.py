@@ -3528,7 +3528,8 @@ def init_run(
         manifest["metadata"]["has_fan_out"] = True
     if cost_estimate is not None:
         manifest["metadata"]["cost_estimate"] = round(cost_estimate, 4)
-        save_manifest(run_dir, manifest)
+    # Always save — has_fan_out must be persisted even when cost estimation fails
+    save_manifest(run_dir, manifest)
 
     # Print summary
     print(f"Run initialized: {run_dir}")

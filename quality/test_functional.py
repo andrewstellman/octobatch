@@ -806,6 +806,38 @@ class TestFitnessScenarios:
             "BUG-7: init_run must detect fan-out steps and flag them in manifest"
         )
 
+    def test_scenario_15_has_fan_out_saved_without_cost_estimate(self):
+        """
+        [Req: formal — BUG-7 / Finding 4a] has_fan_out must be saved to
+        manifest even when cost_estimate is None (cost lookup failed).
+        """
+        import inspect
+        source = inspect.getsource(orchestrate.init_run)
+        # save_manifest must NOT be inside the "if cost_estimate is not None" block
+        # Verify save_manifest appears after the has_fan_out assignment
+        fan_out_pos = source.index('manifest["metadata"]["has_fan_out"]')
+        save_pos = source.index("save_manifest(run_dir, manifest)", fan_out_pos)
+        # Verify save_manifest is NOT inside the cost_estimate conditional
+        between = source[fan_out_pos:save_pos]
+        # There should be no additional nesting that would make save_manifest conditional on cost_estimate
+        assert between.count("if cost_estimate") <= 1, (
+            "Finding 4a: save_manifest must be called unconditionally after has_fan_out"
+        )
+
+    def test_scenario_15_fan_out_warning_shown_when_cost_unknown(self):
+        """
+        [Req: formal — BUG-7 / Finding 4b] get_run_cost() must show ⚠ for
+        fan-out pipelines even when cost is 0 (unknown).
+        """
+        sys.path.insert(0, str(Path(__file__).parent.parent / "scripts" / "tui" / "utils"))
+        from runs import get_run_cost
+
+        manifest = {"metadata": {"has_fan_out": True}}
+        result = get_run_cost(manifest)
+        assert "⚠" in result, (
+            f"Finding 4b: fan-out warning ⚠ must show even when cost is 0, got: '{result}'"
+        )
+
 
 # =============================================================================
 # Group 3: Boundaries and Edge Cases

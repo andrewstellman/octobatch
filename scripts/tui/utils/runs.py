@@ -306,6 +306,8 @@ def get_run_cost(manifest: Dict[str, Any]) -> str:
     if cost > 0:
         suffix = " ⚠" if has_fan_out else ""
         return f"${cost:.4f}{suffix}"
+    if has_fan_out:
+        return "-- ⚠"
     return "--"
 
 
