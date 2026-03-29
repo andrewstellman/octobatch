@@ -88,12 +88,13 @@ from config_validator import (
 
 try:
     from scripts.providers import get_provider, get_step_provider, ProviderError
-    from scripts.providers.base import BatchStatus
+    from scripts.providers.base import BatchStatus, RateLimitError
 except ImportError:
     get_provider = None  # Will error at runtime if provider is needed
     get_step_provider = None
     ProviderError = Exception
     BatchStatus = None
+    RateLimitError = Exception
 
 # Default timeout for subprocess calls (10 minutes)
 # Can be overridden via config's api.subprocess_timeout_seconds
@@ -102,6 +103,10 @@ SUBPROCESS_TIMEOUT_DEFAULT = 600
 # Log progress during long loops if more than this many items
 # This helps prevent false "stale" detection during large batch operations
 PROGRESS_LOG_THRESHOLD = 10
+
+# Exponential backoff for 429 rate limit errors (BUG-5)
+RATE_LIMIT_BACKOFF_SCHEDULE = [30, 60, 120, 300]  # seconds, capped at 300
+RATE_LIMIT_MAX_CONSECUTIVE = 5  # auto-pause after this many consecutive 429s
 
 # Track active subprocesses for cleanup on interrupt
 _active_subprocesses: list[subprocess.Popen] = []
@@ -2700,12 +2705,18 @@ def tick_run(run_dir: Path, max_retries: int = 5, drain_submitted_only: bool = F
     _logged_batch_steps = set()  # Track which steps have had provider logged
     throttled_count = 0
 
+    # Check rate limit backoff — skip submissions if still in backoff period
+    _backoff_until = manifest.get("metadata", {}).get("rate_limit_backoff_until", 0)
+    _skip_submissions = time.time() < _backoff_until
+
     for chunk_name, chunk_data in list(chunks.items()):
         step, status = parse_state(chunk_data["state"])
 
         if status == "PENDING":
             pending += 1
             if drain_submitted_only:
+                continue
+            if _skip_submissions:
                 continue
 
             # Log provider/model once per step
@@ -2926,6 +2937,11 @@ def tick_run(run_dir: Path, max_retries: int = 5, drain_submitted_only: bool = F
                 submitted += 1
                 inflight += 1
 
+                # Reset rate limit backoff on successful submission
+                if manifest.get("metadata", {}).get("consecutive_429s", 0) > 0:
+                    manifest["metadata"]["consecutive_429s"] = 0
+                    manifest["metadata"].pop("rate_limit_backoff_until", None)
+
                 chunk_data["state"] = f"{step}_SUBMITTED"
                 chunk_data["batch_id"] = batch_id
                 chunk_data["submitted_at"] = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
@@ -2940,6 +2956,37 @@ def tick_run(run_dir: Path, max_retries: int = 5, drain_submitted_only: bool = F
 
                 # Save manifest after each submission
                 save_manifest(run_dir, manifest)
+
+            except RateLimitError as e:
+                # Track consecutive rate limit errors for exponential backoff
+                consecutive_429s = manifest.get("metadata", {}).get("consecutive_429s", 0) + 1
+                manifest.setdefault("metadata", {})["consecutive_429s"] = consecutive_429s
+
+                backoff_idx = min(consecutive_429s - 1, len(RATE_LIMIT_BACKOFF_SCHEDULE) - 1)
+                backoff_secs = RATE_LIMIT_BACKOFF_SCHEDULE[backoff_idx]
+                backoff_until = time.time() + backoff_secs
+                manifest["metadata"]["rate_limit_backoff_until"] = backoff_until
+
+                log_message(log_file, "RATE_LIMIT",
+                    f"{chunk_name}: Rate limited ({consecutive_429s} consecutive). "
+                    f"Backing off {backoff_secs}s before next submission.")
+                errors += 1
+                warnings.append({
+                    "code": "RATE_LIMIT",
+                    "message": f"{chunk_name}: Rate limited (429). Backoff {backoff_secs}s.",
+                    "chunk": chunk_name
+                })
+
+                if consecutive_429s >= RATE_LIMIT_MAX_CONSECUTIVE:
+                    log_message(log_file, "RATE_LIMIT",
+                        f"Auto-pausing run after {consecutive_429s} consecutive rate limit errors.")
+                    manifest["metadata"]["auto_paused_reason"] = "rate_limited"
+                    save_manifest(run_dir, manifest)
+                    mark_run_paused(run_dir, reason="Auto-paused: rate limited")
+                    break
+                else:
+                    save_manifest(run_dir, manifest)
+                break  # Stop submitting more chunks this tick
 
             except Exception as e:
                 log_message(log_file, "ERROR", f"{chunk_name}: Submit failed: {e}")

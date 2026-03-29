@@ -969,6 +969,23 @@ class TestBoundariesAndEdgeCases:
         seq_b = [rng_b.choice([0, 1, 2, 3, 4, 5, 6, 7, 8, 9]) for _ in range(20)]
         assert seq_a != seq_b, "Different seeds must produce different sequences"
 
+    def test_bug5_rate_limit_backoff_constants_exist(self):
+        """
+        [Req: formal — BUG-5] Exponential backoff schedule and auto-pause threshold
+        must be defined as constants for rate-limited batch submissions.
+        """
+        assert hasattr(orchestrate, "RATE_LIMIT_BACKOFF_SCHEDULE"), (
+            "BUG-5: RATE_LIMIT_BACKOFF_SCHEDULE constant must exist"
+        )
+        assert hasattr(orchestrate, "RATE_LIMIT_MAX_CONSECUTIVE"), (
+            "BUG-5: RATE_LIMIT_MAX_CONSECUTIVE constant must exist"
+        )
+        schedule = orchestrate.RATE_LIMIT_BACKOFF_SCHEDULE
+        assert len(schedule) >= 4, "Backoff schedule must have at least 4 entries"
+        assert schedule == sorted(schedule), "Backoff schedule must be monotonically increasing"
+        assert schedule[-1] <= 300, "Backoff cap must not exceed 300s"
+        assert orchestrate.RATE_LIMIT_MAX_CONSECUTIVE == 5, "Auto-pause after 5 consecutive 429s"
+
     def test_sigint_save_timeout_is_reasonable(self):
         """
         [Req: inferred — from SIGINT_SAVE_TIMEOUT = 5 constant]
