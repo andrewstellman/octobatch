@@ -642,14 +642,6 @@ class TestFitnessScenarios:
             "(prerequisite for BUG-3 fix in home_screen.py)"
         )
 
-    @pytest.mark.xfail(
-        strict=True,
-        reason=(
-            "BUG-4 (CONFIRMED): format_step_provider_tag() crashes with AttributeError when "
-            "provider_instance is None. Fix: add `if provider_instance is None: return 'unknown'` "
-            "at line ~1166 in orchestrate.py. Remove xfail when fixed."
-        )
-    )
     def test_scenario_13_format_step_provider_tag_handles_none(self):
         """
         [Req: formal — QUALITY.md Scenario 13 / BUG-4]

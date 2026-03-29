@@ -1228,6 +1228,8 @@ def format_step_provider_tag(config: dict, step_name: str, provider_instance) ->
     Returns e.g. 'gemini/gemini-2.0-flash (default)' or
     'anthropic/claude-sonnet-4-5-20250929 (override)'.
     """
+    if provider_instance is None:
+        return "unknown"
     step_cfg = get_step_config(config, step_name)
     has_override = step_cfg and (step_cfg.get("provider") or step_cfg.get("model"))
     prov_name = provider_instance.config.get("api", {}).get("provider", "unknown")
