@@ -1171,7 +1171,14 @@ class HomeScreen(Screen):
         mode = result.get("mode", "batch")
 
         mode_text = "realtime" if mode == "realtime" else "batch"
-        self.notify(f"Run '{run_name}' started in {mode_text} mode")
+        cost_estimate = result.get("cost_estimate")
+        has_fan_out = result.get("has_fan_out", False)
+        cost_msg = ""
+        if cost_estimate is not None:
+            cost_msg = f" | Est. cost: ${cost_estimate:.4f}"
+            if has_fan_out:
+                cost_msg += " ⚠ (fan-out may increase)"
+        self.notify(f"Run '{run_name}' started in {mode_text} mode{cost_msg}")
 
         self._load_data()
         self._populate_stats_cards()

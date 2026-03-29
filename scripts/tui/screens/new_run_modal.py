@@ -588,6 +588,21 @@ class NewRunModal(ModalScreen):
             self._show_error(error)
 
         if success:
+            # Read cost estimate from manifest metadata (saved by init_run)
+            cost_estimate = None
+            has_fan_out = False
+            try:
+                import json
+                manifest_path = run_dir / "MANIFEST.json"
+                if manifest_path.exists():
+                    with open(manifest_path) as f:
+                        manifest_data = json.load(f)
+                    meta = manifest_data.get("metadata", {})
+                    cost_estimate = meta.get("cost_estimate")
+                    has_fan_out = meta.get("has_fan_out", False)
+            except Exception:
+                pass
+
             result = {
                 "run_name": run_name,
                 "run_dir": run_dir,
@@ -597,5 +612,7 @@ class NewRunModal(ModalScreen):
                 "repeat": repeat,
                 "provider": provider,
                 "model": model,
+                "cost_estimate": cost_estimate,
+                "has_fan_out": has_fan_out,
             }
             self.dismiss(result)
