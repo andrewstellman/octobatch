@@ -700,15 +700,20 @@ class TestFitnessScenarios:
     def test_scenario_15_init_run_without_yes_flag_requires_confirmation(self):
         """
         [Req: formal — QUALITY.md Scenario 15 / BUG-7]
-        The --yes flag must exist in the argument parser to gate pre-run confirmation.
-        BUG-7: No pre-run cost estimate before fan-out commitment.
-        An Elena run estimated at ~$100 cost ~$1,856 due to 5,281 → 51,712 unit expansion.
+        The --yes flag must exist in the argument parser and init_run must
+        compute cost_estimate and detect fan-out steps.
         """
         import inspect
         source = inspect.getsource(orchestrate)
-        assert "--yes" in source or "yes" in source.lower(), (
-            "BUG-7: orchestrate.py should include a --yes flag for pre-run confirmation. "
-            "Users must be shown estimated cost before committing to fan-out runs."
+        assert "--yes" in source, (
+            "BUG-7: orchestrate.py should include a --yes flag for pre-run confirmation."
+        )
+        init_source = inspect.getsource(orchestrate.init_run)
+        assert "cost_estimate" in init_source, (
+            "BUG-7: init_run must compute a pre-run cost estimate"
+        )
+        assert "has_fan_out" in init_source, (
+            "BUG-7: init_run must detect fan-out steps and flag them in manifest"
         )
 
 

@@ -3495,11 +3495,48 @@ def init_run(
 
     log_message(log_file, "INIT", "Run initialized successfully")
 
+    # Estimate pre-run cost from registry pricing (BUG-7)
+    has_fan_out = any(
+        s.get("scope") == "fan_out"
+        for s in config.get("pipeline", {}).get("steps", [])
+    )
+    cost_estimate = None
+    if resolved_provider and resolved_model:
+        try:
+            from scripts.providers.base import LLMProvider
+            registry = LLMProvider.load_model_registry()
+            provider_data = registry.get("providers", {}).get(resolved_provider, {})
+            model_data = provider_data.get("models", {}).get(resolved_model, {})
+            if model_data:
+                input_rate = model_data.get("input_per_million", 0)
+                output_rate = model_data.get("output_per_million", 0)
+                # Estimate ~500 input tokens and ~200 output tokens per unit per LLM step
+                llm_step_count = sum(
+                    1 for s in config.get("pipeline", {}).get("steps", [])
+                    if s.get("scope", "chunk") == "chunk"
+                )
+                est_input = total_units * 500 * llm_step_count
+                est_output = total_units * 200 * llm_step_count
+                cost_estimate = (est_input * input_rate + est_output * output_rate) / 1_000_000 * 0.5  # batch discount
+        except Exception:
+            pass
+
+    # Store fan-out flag and cost estimate in manifest metadata
+    if has_fan_out:
+        manifest["metadata"]["has_fan_out"] = True
+    if cost_estimate is not None:
+        manifest["metadata"]["cost_estimate"] = round(cost_estimate, 4)
+        save_manifest(run_dir, manifest)
+
     # Print summary
     print(f"Run initialized: {run_dir}")
     print(f"  Units: {total_units}")
     print(f"  Chunks: {num_chunks}")
     print(f"  Pipeline: {' -> '.join(pipeline_steps)}")
+    if cost_estimate is not None:
+        print(f"  Estimated cost: ${cost_estimate:.4f} (batch pricing, {total_units} units)")
+        if has_fan_out:
+            print(f"  ⚠ Pipeline has fan-out steps — actual cost may be significantly higher")
 
     return True
 

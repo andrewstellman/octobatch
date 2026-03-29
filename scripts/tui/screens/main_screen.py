@@ -1871,12 +1871,25 @@ class MainScreen(Screen):
         if self.run_data and self.run_data.max_units is not None:
             max_units_str = f"\nMax Units:     {self.run_data.max_units}"
 
+        # Check for fan-out warning
+        fan_out_warning = ""
+        if self.run_data and self.run_data.run_dir:
+            try:
+                manifest_path = self.run_data.run_dir / "MANIFEST.json"
+                if manifest_path.exists():
+                    with open(manifest_path) as f:
+                        _manifest = json.load(f)
+                    if _manifest.get("metadata", {}).get("has_fan_out"):
+                        fan_out_warning = "\n[bold yellow]⚠ Fan-out pipeline: costs may be higher than estimate[/]"
+            except Exception:
+                pass
+
         content = f"""[bold]Run Stats[/]
 ────────────────────
 Total Cost:    ${total_cost:.4f}
 Total Tokens:  {total_tokens:,}
 Duration:      {duration}
-Mode:          {mode_display}{max_units_str}
+Mode:          {mode_display}{max_units_str}{fan_out_warning}
 """
 
         # Add realtime progress section for running realtime jobs

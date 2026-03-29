@@ -296,10 +296,12 @@ def get_run_cost_value(manifest: Dict[str, Any]) -> float:
 
 
 def get_run_cost(manifest: Dict[str, Any]) -> str:
-    """Get formatted cost string from manifest."""
+    """Get formatted cost string from manifest. Shows ⚠ for fan-out pipelines."""
     cost = get_run_cost_value(manifest)
+    has_fan_out = manifest.get("metadata", {}).get("has_fan_out", False)
     if cost > 0:
-        return f"${cost:.4f}"
+        suffix = " ⚠" if has_fan_out else ""
+        return f"${cost:.4f}{suffix}"
     return "--"
 
 
