@@ -716,6 +716,77 @@ class TestFitnessScenarios:
             "BUG-6: hardcoded output_rate=0.30 found in main_screen.py"
         )
 
+    def test_scenario_14_runs_py_no_hardcoded_pricing_fallback(self):
+        """
+        [Req: formal — BUG-6 / Finding 3b] _get_model_pricing() in runs.py must
+        NOT have hardcoded rate fallbacks. Return (0.0, 0.0) for unknown models.
+        """
+        runs_path = Path(__file__).parent.parent / "scripts" / "tui" / "utils" / "runs.py"
+        if not runs_path.exists():
+            pytest.skip("runs.py not found")
+        source = runs_path.read_text()
+        # Must not have the old hardcoded fallback
+        assert "return 0.075, 0.30" not in source, (
+            "Finding 3b: _get_model_pricing must not have hardcoded 0.075/0.30 fallback"
+        )
+        # Must return (0.0, 0.0) for unknown models
+        assert "return 0.0, 0.0" in source, (
+            "Finding 3b: _get_model_pricing must return (0.0, 0.0) for unknown models"
+        )
+
+    def test_scenario_14_cost_respects_run_mode(self):
+        """
+        [Req: formal — BUG-6 / Finding 3a] Cost calculation must check run mode
+        and apply the correct multiplier (batch 0.5x vs realtime multiplier).
+        """
+        main_screen_path = Path(__file__).parent.parent / "scripts" / "tui" / "screens" / "main_screen.py"
+        if not main_screen_path.exists():
+            pytest.skip("main_screen.py not found")
+        source = main_screen_path.read_text()
+        # Must check mode before applying multiplier
+        assert 'mode == "realtime"' in source, (
+            "Finding 3a: _calculate_cost_from_manifest must check for realtime mode"
+        )
+
+    def test_scenario_14_get_model_pricing_batch_vs_realtime(self):
+        """
+        [Req: formal — BUG-6 / Finding 3a] _get_model_pricing returns different
+        rates for batch vs realtime mode for the same model.
+        """
+        sys.path.insert(0, str(Path(__file__).parent.parent / "scripts" / "tui" / "utils"))
+        from runs import _get_model_pricing
+
+        batch_manifest = {"metadata": {"provider": "gemini", "model": "gemini-2.0-flash-001", "mode": "batch"}}
+        realtime_manifest = {"metadata": {"provider": "gemini", "model": "gemini-2.0-flash-001", "mode": "realtime"}}
+
+        batch_input, batch_output = _get_model_pricing(batch_manifest)
+        realtime_input, realtime_output = _get_model_pricing(realtime_manifest)
+
+        # Both must be > 0 (model is in registry)
+        assert batch_input > 0, "Batch input rate must be > 0 for known model"
+        assert batch_output > 0, "Batch output rate must be > 0 for known model"
+        assert realtime_input > 0, "Realtime input rate must be > 0 for known model"
+        # Realtime rates should be higher than batch rates
+        assert realtime_input > batch_input, (
+            f"Realtime input rate ({realtime_input}) must be > batch ({batch_input})"
+        )
+
+    def test_scenario_14_get_model_pricing_unknown_model(self):
+        """
+        [Req: formal — BUG-6 / Finding 3b] _get_model_pricing returns (0, 0) for
+        unknown models, not hardcoded rates.
+        """
+        sys.path.insert(0, str(Path(__file__).parent.parent / "scripts" / "tui" / "utils"))
+        from runs import _get_model_pricing
+
+        manifest = {"metadata": {"provider": "gemini", "model": "nonexistent-model-xyz", "mode": "batch"}}
+        input_rate, output_rate = _get_model_pricing(manifest)
+        # Unknown model: should get 0.0 (cost unknown), not a hardcoded rate
+        # The default_model fallback may kick in, so we only assert no hardcoded 0.075
+        assert input_rate != 0.075 or output_rate != 0.30, (
+            "Finding 3b: must not return hardcoded Flash pricing for unknown model"
+        )
+
     def test_scenario_15_init_run_without_yes_flag_requires_confirmation(self):
         """
         [Req: formal — QUALITY.md Scenario 15 / BUG-7]

@@ -2298,6 +2298,7 @@ Passed:        {passed}
             registry_path = Path(__file__).parent.parent.parent / "providers" / "models.yaml"
             input_rate = None
             output_rate = None
+            realtime_multiplier = 2.0
 
             if provider_name and model_name and registry_path.exists():
                 try:
@@ -2306,6 +2307,7 @@ Passed:        {passed}
                         registry = yaml.safe_load(f)
                     providers = registry.get("providers", {})
                     provider_data = providers.get(provider_name, {})
+                    realtime_multiplier = provider_data.get("realtime_multiplier", 2.0)
                     model_data = provider_data.get("models", {}).get(model_name, {})
                     if model_data:
                         input_rate = model_data.get("input_per_million")
@@ -2317,8 +2319,14 @@ Passed:        {passed}
                 # Model not in registry — return "cost unknown" (0.0) rather than wrong number
                 return (0.0, total_tokens)
 
-            # Apply batch discount (50%) — standard across providers
-            cost = (input_tokens / 1_000_000 * input_rate + output_tokens / 1_000_000 * output_rate) * 0.5
+            # Apply pricing multiplier based on run mode
+            mode = metadata.get("mode", "batch")
+            base_cost = input_tokens / 1_000_000 * input_rate + output_tokens / 1_000_000 * output_rate
+            if mode == "realtime":
+                cost = base_cost * realtime_multiplier
+            else:
+                # Batch mode: 50% discount (standard across providers)
+                cost = base_cost * 0.5
             return (cost, total_tokens)
         except Exception:
             return (0.0, 0)

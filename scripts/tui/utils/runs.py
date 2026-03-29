@@ -235,13 +235,16 @@ def _load_model_registry() -> dict:
 def _get_model_pricing(manifest: Dict[str, Any]) -> tuple:
     """Look up input/output pricing from the model registry based on manifest metadata.
 
-    Returns (input_per_million, output_per_million, realtime_multiplier).
-    Falls back to Gemini batch rates if provider/model unknown.
+    Returns (input_per_million, output_per_million) with mode-based multiplier applied.
+    Returns (0.0, 0.0) when the model isn't in the registry — never a hardcoded fallback.
     """
     metadata = manifest.get("metadata", {})
-    provider_name = metadata.get("provider") or metadata.get("cli_provider") or "gemini"
+    provider_name = metadata.get("provider") or metadata.get("cli_provider")
     model_name = metadata.get("model") or metadata.get("cli_model")
     mode = metadata.get("mode", "batch")
+
+    if not provider_name:
+        return 0.0, 0.0
 
     registry = _load_model_registry()
     providers = registry.get("providers", {})
@@ -249,28 +252,29 @@ def _get_model_pricing(manifest: Dict[str, Any]) -> tuple:
     realtime_multiplier = provider_data.get("realtime_multiplier", 2.0)
 
     # Try to find the model in the provider's model list
+    model_data = None
     if model_name:
-        models = provider_data.get("models", {})
-        model_data = models.get(model_name, {})
-        if model_data:
-            input_rate = model_data.get("input_per_million", 0.075)
-            output_rate = model_data.get("output_per_million", 0.3)
-            multiplier = realtime_multiplier if mode == "realtime" else 1.0
-            return input_rate * multiplier, output_rate * multiplier
+        model_data = provider_data.get("models", {}).get(model_name)
 
-    # Try default model for the provider
-    default_model = provider_data.get("default_model")
-    if default_model:
-        models = provider_data.get("models", {})
-        model_data = models.get(default_model, {})
-        if model_data:
-            input_rate = model_data.get("input_per_million", 0.075)
-            output_rate = model_data.get("output_per_million", 0.3)
-            multiplier = realtime_multiplier if mode == "realtime" else 1.0
-            return input_rate * multiplier, output_rate * multiplier
+    # Fall back to provider's default model
+    if not model_data:
+        default_model = provider_data.get("default_model")
+        if default_model:
+            model_data = provider_data.get("models", {}).get(default_model)
 
-    # Fallback to Gemini batch rates
-    return 0.075, 0.30
+    if not model_data:
+        return 0.0, 0.0
+
+    input_rate = model_data.get("input_per_million")
+    output_rate = model_data.get("output_per_million")
+    if input_rate is None or output_rate is None:
+        return 0.0, 0.0
+
+    # Apply mode-based multiplier: realtime uses provider multiplier, batch uses 50% discount
+    if mode == "realtime":
+        return input_rate * realtime_multiplier, output_rate * realtime_multiplier
+    else:
+        return input_rate * 0.5, output_rate * 0.5
 
 
 def get_run_cost_value(manifest: Dict[str, Any]) -> float:
