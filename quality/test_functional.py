@@ -657,15 +657,6 @@ class TestFitnessScenarios:
         result = format_step_provider_tag(config, "generate", None)
         assert isinstance(result, str)
 
-    @pytest.mark.xfail(
-        strict=True,
-        reason=(
-            "BUG-6 (CONFIRMED): main_screen.py contains hardcoded output_rate=0.30 (Flash pricing "
-            "fallback). This causes 17x cost undercount for Pro models ($0.30/M shown instead of "
-            "$5.00/M for Gemini 2.5 Pro). Fix: load pricing from scripts/providers/models.yaml "
-            "using manifest provider+model. Remove xfail when fixed."
-        )
-    )
     def test_scenario_14_cost_calculation_uses_registry_not_hardcoded(self):
         """
         [Req: formal — QUALITY.md Scenario 14 / BUG-6]

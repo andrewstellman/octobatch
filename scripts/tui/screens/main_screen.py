@@ -2277,24 +2277,35 @@ Passed:        {passed}
                     output_tokens += chunk_data.get("output_tokens", 0)
                 total_tokens = input_tokens + output_tokens
 
-            # Load pricing from config
-            config_name = manifest.get("config", "")
-            config_path = run_dir / config_name if config_name else None
-            input_rate = 0.075  # Default Gemini Flash Batch pricing
-            output_rate = 0.30
+            # Load pricing from models.yaml registry using manifest provider+model
+            metadata = manifest.get("metadata", {})
+            provider_name = metadata.get("provider")
+            model_name = metadata.get("model")
 
-            if config_path and config_path.exists():
+            registry_path = Path(__file__).parent.parent.parent / "providers" / "models.yaml"
+            input_rate = None
+            output_rate = None
+
+            if provider_name and model_name and registry_path.exists():
                 try:
                     import yaml
-                    with open(config_path) as f:
-                        config = yaml.safe_load(f)
-                    pricing = config.get("api", {}).get("pricing", {})
-                    input_rate = pricing.get("input_per_million", input_rate)
-                    output_rate = pricing.get("output_per_million", output_rate)
+                    with open(registry_path) as f:
+                        registry = yaml.safe_load(f)
+                    providers = registry.get("providers", {})
+                    provider_data = providers.get(provider_name, {})
+                    model_data = provider_data.get("models", {}).get(model_name, {})
+                    if model_data:
+                        input_rate = model_data.get("input_per_million")
+                        output_rate = model_data.get("output_per_million")
                 except Exception:
                     pass
 
-            cost = (input_tokens / 1_000_000 * input_rate) + (output_tokens / 1_000_000 * output_rate)
+            if input_rate is None or output_rate is None:
+                # Model not in registry — return "cost unknown" (0.0) rather than wrong number
+                return (0.0, total_tokens)
+
+            # Apply batch discount (50%) — standard across providers
+            cost = (input_tokens / 1_000_000 * input_rate + output_tokens / 1_000_000 * output_rate) * 0.5
             return (cost, total_tokens)
         except Exception:
             return (0.0, 0)
