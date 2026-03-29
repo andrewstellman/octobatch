@@ -65,10 +65,13 @@ When you receive the bootstrap prompt:
 ---
 
 ## Last Updated
-**Mar 9, 2026** - v1.1 feature implementation complete, documentation updated
+**Mar 21, 2026** - Added 5 active bugs (TUI UX issues from production use), 5 new technical learnings (#44-48), updated active runs status
 
 ## Current Focus
 - v1.1 stabilization and testing
+- TUI UX fixes: stuck-status management (BUG-2), pending-status resume (BUG-3), restart messaging (BUG-1)
+- Rate limit handling improvements (BUG-5)
+- Game content pipelines: TarotEnhance (9,240 triples), ElenaDialogue v2, Sallos demon dialog (design phase)
 
 ## Recently Completed
 - **Mar 9**: v1.1 WP4 — Fan-out steps (`scope: fan_out`), `--revalidate` flag (already implemented), stochastic integration testing runner
@@ -104,7 +107,63 @@ When you receive the bootstrap prompt:
 
 ## Active Bugs Being Debugged
 
-(None)
+### BUG-1: TUI Restart Dialog Message Implies Data Loss
+- **Symptom**: Restart confirmation says "This will kill the current process and relaunch" — users interpret this as losing progress
+- **Better message**: "This will stop the current orchestrator process and start a new one. All completed work is preserved — it will resume from where it left off."
+- **Location**: `scripts/tui/screens/home_screen.py` or `main_screen.py` — restart confirmation dialog
+- **Severity**: UX (misleading, not broken)
+- **Discovered**: Mar 21, 2026
+
+### BUG-2: Cannot Pause or Kill Runs With "stuck" Status
+- **Symptom**: `Cannot pause run with status 'stuck'` — user cannot manage rate-limited runs
+- **Root cause**: TUI status guards only allow pause/kill on "running" status. "stuck" (has errors, e.g. sustained 429s) is excluded.
+- **Fix**: Allow pause and kill actions on "stuck" status. Stuck runs have an active orchestrator PID that needs stopping.
+- **Location**: `scripts/tui/screens/home_screen.py` — status guard in pause/kill handlers
+- **Severity**: UX blocking (user cannot manage rate-limited runs)
+- **Discovered**: Mar 21, 2026
+
+### BUG-3: Cannot Resume "pending" Runs From TUI
+- **Symptom**: `Cannot resume run with status 'pending'` — newly initialized runs require CLI to start
+- **Root cause**: TUI resume (R key) only works on paused/failed/zombie runs. Pending runs (initialized but never started) are excluded.
+- **Fix**: Allow TUI to launch pending runs — detect pending status and invoke the appropriate CLI command (--watch or --realtime based on user selection).
+- **Location**: `scripts/tui/screens/home_screen.py` — resume handler
+- **Severity**: UX gap (forces CLI workaround)
+- **Discovered**: Mar 21, 2026
+
+### BUG-4: format_step_provider_tag Crashes When provider_instance Is None
+- **Symptom**: `NoneType has no attribute 'config'` in `format_step_provider_tag()` when API key is missing
+- **Root cause**: `get_provider()` throws on missing API key, caught by broad except, leaves `realtime_provider = None`. Then `format_step_provider_tag(realtime_provider)` dereferences it.
+- **Fix**: Add defensive None check: `if provider_instance is None: return "unknown"`
+- **Location**: `scripts/orchestrate.py` — `format_step_provider_tag()` around line 1166
+- **Severity**: Crash (but only when API key is missing)
+- **Discovered**: Mar 21, 2026
+
+### BUG-5: Rate-Limited Runs Enter Tight Retry Loop Instead of Backing Off
+- **Symptom**: Orchestrator retries 429 RESOURCE_EXHAUSTED every ~17 seconds indefinitely, flooding logs and burning quota check cycles
+- **Root cause**: Batch retry logic doesn't distinguish sustained rate limits from transient errors. No exponential backoff for 429s.
+- **Note**: Adaptive rate limiting infrastructure exists but may not be fully engaged for batch-mode 429 responses.
+- **Fix**: Implement exponential backoff specifically for 429 responses, or auto-pause after N consecutive 429s with user notification.
+- **Location**: `scripts/orchestrate.py` — batch retry loop, `scripts/providers/gemini.py` — error handling
+- **Severity**: Resource waste + poor UX (run appears stuck with no recovery path)
+- **Discovered**: Mar 21, 2026
+- **See also**: FEATURE-1 (cross-process rate limit coordination)
+
+### BUG-6: TUI Cost Calculation Uses Hardcoded Flash Pricing as Fallback
+- **Symptom**: TUI shows drastically wrong cost for runs using Gemini 2.5 Pro. Output priced at $0.30/M (Flash batch) instead of $5.00/M (Pro batch) — a 17x undercount.
+- **Root cause**: `_calculate_cost_from_manifest()` in `main_screen.py` line 2283 falls back to `input_rate = 0.075, output_rate = 0.30` when `config.api.pricing` block is missing. But pricing is registry-driven (`models.yaml`), not config-driven — so the fallback always triggers.
+- **Fix**: Load pricing from `scripts/providers/models.yaml` using the manifest's provider+model, not from the pipeline config. The registry is the single source of truth for pricing.
+- **Location**: `scripts/tui/screens/main_screen.py` — `_calculate_cost_from_manifest()` lines 2280-2295
+- **Severity**: Critical — cost display is silently wrong by 10-17x for Pro models, giving false confidence that runs are cheap
+- **Discovered**: Mar 21, 2026
+
+### BUG-7: No Pre-Run Cost Estimate That Accounts for Fan-Out Expansion
+- **Symptom**: No way to see projected total cost before committing to a run. The `--init` step doesn't estimate cost, and `cost_cap_usd` only applies to realtime mode.
+- **Root cause**: Cost estimation only happens after batches return with token counts. For fan-out pipelines, the true unit count isn't known until fan-out completes, but a reasonable estimate could be computed from item data + expected fan-out multiplier.
+- **Impact**: Elena run was expected to cost ~$100 but actual cost is ~$1,856. The fan-out from 5,281 → 51,712 units was the unaccounted multiplier.
+- **Location**: `scripts/orchestrate.py` — `init_run()`, `scripts/tui/screens/new_run_modal.py`
+- **Severity**: Critical — users commit to multi-hundred-dollar runs with no cost visibility
+- **Discovered**: Mar 21, 2026
+- **See also**: FEATURE-2 (cost controls)
 
 ## Backlog Reference
 
@@ -112,6 +171,90 @@ The backlog is managed in Claude.ai/Gemini planning sessions, not in this file.
 
 This file tracks **technical state** (what was built, how it works, active bugs).
 **Priorities and planning** are communicated directly in chat prompts.
+
+### FEATURE-1: Cross-Process Rate Limit Coordination and PID Observability
+
+**Motivation**: On Mar 21, 2026 four orchestrator processes were discovered running simultaneously against the same Gemini quota (an old `elena_full_26pro`, two copies of `elena_full_26pro_v2`, and `enhance_pro`). All four were stuck in 429 retry loops. Manifests showed `pid: None` so the TUI couldn't surface this. The user had to manually `ps aux | grep orchestrate` to find and kill them. This is a systemic gap — Octobatch has no awareness of sibling processes sharing the same API quota.
+
+**Scope**: Three related capabilities that build on existing adaptive rate limiting infrastructure:
+
+**1. Process Registry and PID Observability**
+- Write a lightweight lockfile or PID registry (e.g., `runs/.orchestrator_pids.json`) updated by each orchestrator on start/stop
+- Each entry: `{run_dir, pid, provider, model, started_at, last_heartbeat}`
+- Heartbeat updated every tick cycle so stale entries can be detected (process died without cleanup)
+- TUI home screen shows active orchestrator count and warns on duplicates for the same run
+- `--status` CLI flag reads the registry and reports all active orchestrators
+- On init/watch/realtime, check registry for existing process on same run_dir — warn or refuse if duplicate
+
+**2. Cross-Process Rate Limit Coordination**
+- Orchestrators sharing a provider+model pair should coordinate submission rates
+- Option A (simple): File-based semaphore. Before submitting a batch, check how many sibling processes are active for same provider. Divide submission rate by N.
+- Option B (better): Shared rate limit state file (e.g., `runs/.rate_state_{provider}.json`) recording last 429 timestamp, backoff level, and active process count. Each orchestrator reads before submitting, writes after 429. Exponential backoff is shared — one process hitting 429 backs off ALL siblings.
+- Option C (best): Single submission queue. One process acts as rate-limit coordinator, others enqueue requests. Adds complexity but eliminates contention entirely.
+- **Recommendation**: Start with Option B — it's lock-free (atomic file writes), requires minimal orchestrator changes, and handles the common case (2-3 concurrent runs).
+
+**3. Adaptive Backoff for Sustained 429s**
+- Existing adaptive rate limiting infrastructure may only cover realtime mode or per-request throttling
+- Batch-mode 429 handling needs: exponential backoff (30s → 60s → 120s → 300s), cap at 5 min
+- After N consecutive 429s (configurable, default 5), auto-pause the run and notify TUI
+- TUI shows "Auto-paused: rate limited" with option to resume or schedule delayed restart
+- Log the backoff state so resumed runs start with the last backoff interval, not from scratch
+
+**Implementation notes**:
+- PID registry (#1) is prerequisite for coordination (#2)
+- Registry cleanup: use heartbeat staleness (>60s) to detect dead processes, not just PID existence (PIDs can be recycled)
+- The TUI already has `get_process_health()` — extend it to read the registry
+- `--init` should NOT register (no API calls yet). `--watch` and `--realtime` register on entry, deregister on exit/signal.
+- Signal handlers (SIGTERM, SIGINT) must deregister before exit
+
+**Priority**: High — this is the root cause of the Mar 21 rate limit incident and will recur whenever multiple runs target the same provider.
+
+### FEATURE-2: Cost Controls, Estimation, and Budget Guardrails
+
+**Motivation**: On Mar 21, 2026 a run estimated at ~$100 turned out to cost ~$1,856. The TUI showed wrong costs (17x undercount due to hardcoded Flash pricing fallback), there was no pre-run estimate, and no budget guardrail stopped the run. This is the most impactful UX gap — users need accurate cost visibility before, during, and after runs.
+
+**Scope**: Five capabilities, roughly in priority order:
+
+**1. Fix Registry-Driven Cost Calculation (BUG-6 fix)**
+- `_calculate_cost_from_manifest()` must load pricing from `scripts/providers/models.yaml` using the run's provider+model from manifest metadata
+- Never fall back to hardcoded rates — if model isn't in registry, show "cost unknown" rather than a wrong number
+- Apply batch vs realtime pricing based on manifest mode
+- This fix alone would have shown ~$347 spent instead of ~$20
+
+**2. Pre-Run Cost Estimation at Init Time**
+- `--init` should compute and display an estimated total cost before creating the run
+- For fan-out pipelines: estimate fan-out multiplier from a sample of items (e.g., count average array length of the `field` being fanned out)
+- Formula: `sum over LLM steps of (estimated_units × avg_input_tokens × input_rate + estimated_units × avg_output_tokens × output_rate)`
+- Token estimates: use schema `maxLength` fields as upper bound for output, template size + item size for input
+- Display: "Estimated cost: $1,200–$1,800 (fan-out expansion: ~10x from generate to refine/score)"
+- For `--init` in CLI: print estimate and require `--yes` or interactive confirmation
+- For TUI new run modal: show estimate before launch button
+
+**3. Budget Cap for Batch Mode**
+- Extend `cost_cap_usd` to work in batch mode, not just realtime
+- After each batch completes, compute cumulative cost. If approaching cap (e.g., 80%), warn. If exceeding cap, auto-pause.
+- Manifest tracks `metadata.cost_spent_usd` updated after each batch validation
+- TUI shows budget bar: `$347 / $500 cap [=======>        ] 69%`
+- CLI: `--cost-cap 500` flag, also settable in config.yaml `api.batch.cost_cap_usd`
+
+**4. Accurate In-Flight Cost Projection**
+- Current projection (`current_cost / progress_ratio`) is correct in principle but broken because input cost is wrong (BUG-6)
+- After BUG-6 fix, also improve progress_ratio for fan-out pipelines: weight steps by expected unit count, not equally
+- Example: generate=5,281 units (5%), expand_lines=0 cost (0%), refine=51,712 units (47.5%), score=51,712 units (47.5%)
+- Show both "spent so far" and "projected total" prominently in TUI stats panel
+
+**5. Post-Run Cost Report**
+- `--report` should include a cost breakdown by step with actual token counts and pricing
+- Compare actual vs estimated if pre-run estimate was computed
+- Track cost per unit for benchmarking across runs
+
+**Implementation notes**:
+- #1 is a bug fix, ship immediately — the wrong pricing fallback is actively misleading
+- #2 and #3 require token estimation heuristics — start conservative (overestimate rather than under)
+- Fan-out multiplier estimation: read a sample of items, compute `mean(len(item[fan_out_field]))`, multiply by upstream unit count
+- `models.yaml` is already the pricing source of truth — just need to make the TUI use it
+
+**Priority**: Critical — cost visibility is a safety issue. Users are committing to $1,800 runs thinking they cost $100.
 
 ## Key Technical Learnings
 
@@ -383,8 +526,58 @@ This file tracks **technical state** (what was built, how it works, active bugs)
 - **Discovered**: Feb 14, 2026
 - **Location**: `scripts/tui/screens/main_screen.py` - `_count_step_failures()`, `_get_max_retries()`, `_update_run_stats_panel()`, unit table rendering; `scripts/tui/widgets/pipeline_view.py` - `render_pipeline_boxes()` failure rows
 
+### 49. Fan-Out Pipelines Multiply Cost Non-Obviously — Estimate Before Committing
+- **What**: A 4-step pipeline with fan-out produced 51,712 child units from 5,281 parents (~10x expansion). The refine and score steps each process all 51,712 units at ~$14/1K output tokens (2.5 Pro batch). Total cost: ~$1,856 vs naively expected ~$100.
+- **Why**: Cost estimation that only counts top-level items misses the fan-out multiplier entirely. For Elena: 5,281 generate calls → fan-out to 51,712 → 51,712 refine calls → 51,712 score calls = ~108K total API calls. The generate step was only 6% of total cost. Pre-run cost estimation MUST account for fan-out expansion by sampling the fan-out field from items to estimate the multiplier. Additionally, the TUI's `_calculate_cost_from_manifest()` used hardcoded Flash pricing ($0.30/M output) as fallback instead of the actual Pro pricing ($5.00/M output) — a 17x undercount that masked the true cost during the run.
+- **Discovered**: Mar 21, 2026
+- **Location**: `scripts/tui/screens/main_screen.py` - `_calculate_cost_from_manifest()`, `scripts/orchestrate.py` - `init_run()` (no pre-run estimate exists)
+
+### 44. TUI Status Guards Must Include "stuck" for Pause/Kill Actions
+- **What**: The TUI's pause and kill action handlers check manifest status against an allowlist (e.g., `status == "running"`). "stuck" is excluded, preventing users from managing rate-limited runs.
+- **Why**: "stuck" status means the orchestrator detected errors (e.g., sustained 429 rate limits) but the PID is still active. The user needs to pause or kill to regain control, but the status guard blocks it. The same PID-based pause/kill logic that works for "running" applies equally to "stuck" — the difference is cosmetic, not functional.
+- **Discovered**: Mar 21, 2026
+- **Location**: `scripts/tui/screens/home_screen.py` — pause/kill action handlers
+
+### 45. Large YAML Item Files Cause Slow Pipeline Init — Consider JSON Alternative
+- **What**: A 48MB `items.yaml` (9,240 triples with full card definitions) takes significant time to parse during pipeline initialization. JSON would be much faster.
+- **Why**: PyYAML's safe_load is a pure-Python parser that scales poorly with file size. JSON parsing (via C-optimized `json` module) is typically 10-50x faster for the same data. Since items files are machine-generated by ETL scripts (not hand-edited), YAML's readability advantage is minimal. Supporting `items.json` alongside `items.yaml` in `generate_units.py` would let ETL scripts choose the faster format.
+- **Discovered**: Mar 21, 2026
+- **Location**: `scripts/generate_units.py` — items file loading
+
+### 46. asteval Does Not Support Generator Expressions — Use List Comprehensions
+- **What**: Validation rules using `set(s['field'] for s in items)` fail with `NotImplementedError` in asteval. Must use `set([s['field'] for s in items])` instead.
+- **Why**: asteval's safe expression evaluator intentionally omits generator expression support. List comprehensions are supported and functionally equivalent for the small collections used in validation rules. This applies to all validation `expr` fields in pipeline `config.yaml` files.
+- **Discovered**: Mar 21, 2026
+- **Location**: `pipelines/TarotEnhance/config.yaml` — validation rules `unique_registers` and `unique_thematic_tags`
+
+### 47. ETL Scripts Must Handle Multiple Input Formats — Defensive Parsing
+- **What**: `extract_triples.py` originally assumed `.json.gz` files with string card names and story-nested coherence data. Real output had plain `.json`, embedded card dicts, and top-level score arrays.
+- **Why**: Pipeline output format evolves as the pipeline matures. ETL scripts bridging pipeline output into downstream pipelines must handle format variations defensively: check `isinstance()` before assuming string vs dict, prefer top-level arrays with fallback to nested data, glob for multiple file extensions. The alternative — fixing upstream output format — is impractical when processing historical runs.
+- **Discovered**: Mar 21, 2026
+- **Location**: `scripts/extract_triples.py` — `resolve_card()`, `extract_triple()`, file discovery patterns
+
+### 48. Flash Models Inadequate for Complex Prompt Templates — Validate Before Full Runs
+- **What**: Gemini 2.0 Flash achieved only 10.4% validation pass rate on TarotEnhance (931/8,932) vs 100% for 2.5-pro (5/5 test). Primary failure: empty `journal_entry` fields.
+- **Why**: Complex prompts with multiple output fields, style constraints, and cross-field dependencies exceed flash-tier models' instruction following. The cost savings (~20x cheaper) are negated by retry volume and poor output quality. Always run a small test batch (5-10 units) with the target model before committing to a full run. This also validates schema constraints — the test run revealed `journal_entry.maxLength: 200` was too tight (bumped to 400).
+- **Discovered**: Mar 21, 2026
+- **Location**: `pipelines/TarotEnhance/` — observed during flash test run `enhance_flash_full`
+
 ## Active Runs
-(No active runs)
+
+### elena_full_26pro_v2
+- **Pipeline**: ElenaDialogue (4-step: generate → expand_lines → refine → score)
+- **Provider**: Gemini 2.5 Pro (batch mode)
+- **Status**: Stuck — sustained 429 RESOURCE_EXHAUSTED rate limits
+- **PID**: 67922 (may need kill + restart)
+- **Notes**: Improvements over v1: model upgrade to 2.5-pro, bug fixes (Jinja2 None handling, repair_run richest-record-wins)
+
+### enhance_pro
+- **Pipeline**: TarotEnhance (single-step: enhance)
+- **Provider**: Gemini 2.5 Pro (batch mode)
+- **Items**: 9,240 Major Arcana triples (22×21×20)
+- **Status**: Stuck — sustained 429 RESOURCE_EXHAUSTED rate limits (concurrent with elena_full_26pro_v2)
+- **PID**: 86415 (may need kill + restart)
+- **Notes**: Both runs hit rate limits simultaneously. Kill both, restart one at a time. Estimated cost: ~$102 batch mode.
 
 ## Key Files Reference
 - **Orchestrator**: `scripts/orchestrate.py`

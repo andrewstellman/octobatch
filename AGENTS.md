@@ -100,6 +100,18 @@ Run data lives in `runs/` with MANIFEST.json as the single source of truth for r
 - Seeded randomness uses `hash(unit_id + step_name) & 0x7FFFFFFF`, not sequential integers. Sequential seeds create correlated random streams.
 - Config + templates + schemas are snapshot-copied to the run directory on init, enabling independent re-runs.
 
+## Quality docs
+
+The project has a full quality system in `quality/`. Read these before modifying core logic:
+
+- `quality/QUALITY.md` — Quality constitution: 15 fitness-to-purpose scenarios, coverage targets, theater prevention. **Read this first.** It tells you what "working correctly" means and lists the real failure modes that have caused data loss or cost miscalculation.
+- `quality/test_functional.py` — 67 automated functional tests (65 passing, 2 xfail confirming BUG-4 and BUG-6). Run with `pytest quality/test_functional.py`.
+- `quality/RUN_CODE_REVIEW.md` — Structured code review protocol with 7 focus areas and mandatory guardrails. Run before merging changes to the orchestrator.
+- `quality/RUN_INTEGRATION_TESTS.md` — End-to-end pipeline tests across all 3 providers with Field Reference Table and post-run verification checklist. Run when changing provider adapters or pipeline execution logic.
+- `quality/RUN_SPEC_AUDIT.md` — Council of Three multi-model spec audit protocol. Run quarterly or after major refactors.
+
+Active bugs (BUG-1 through BUG-7) are documented in `ai_context/DEVELOPMENT_CONTEXT.md`. Do not re-report them — they are known and tracked.
+
 ## Detailed context
 
 For deeper context, read these files in order:
