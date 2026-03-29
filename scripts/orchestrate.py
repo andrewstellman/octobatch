@@ -5382,11 +5382,16 @@ def run_realtime_retries(
                     unit_id = item.get("unit_id")
                     if unit_id:
                         validated_units.add(unit_id)
+                        # Merge inherited context fields from the original input
+                        # so retry records are not stripped of previous-step data
+                        original_input = retryable_failures[unit_id].get("input", {})
+                        merged = {**original_input, **item}
+                        merged["unit_id"] = unit_id  # Ensure unit_id is preserved
                         # Append to original chunk's validated file
                         chunk_name = retryable_failures[unit_id]["chunk_name"]
                         chunk_validated = chunks_dir / chunk_name / f"{step}_validated.jsonl"
                         with open(chunk_validated, 'a') as vf:
-                            vf.write(json.dumps(item) + '\n')
+                            vf.write(json.dumps(merged) + '\n')
                 except json.JSONDecodeError:
                     continue
 

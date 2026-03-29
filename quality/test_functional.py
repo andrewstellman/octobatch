@@ -1007,6 +1007,25 @@ class TestBoundariesAndEdgeCases:
             "BUG-8: _watch_loop must patch stuck FAILED chunks each tick"
         )
 
+    def test_bug9_retry_result_preserves_context_fields(self):
+        """
+        [Req: formal — BUG-9] When retry results are merged back into the
+        original chunk's validated file, inherited context fields from the
+        input must be preserved. The retry merge code must use {**input, **item}
+        pattern to ensure no fields are stripped.
+        """
+        import inspect
+        # Find the retry merge section in orchestrate.py
+        source = inspect.getsource(orchestrate)
+        # The fix must merge original input into validated item
+        assert 'original_input' in source or '**original_input' in source, (
+            "BUG-9: retry result merging must reference original input data"
+        )
+        # Verify the merge pattern exists
+        assert '{**original_input, **item}' in source, (
+            "BUG-9: retry results must merge input context via {**original_input, **item}"
+        )
+
     def test_sigint_save_timeout_is_reasonable(self):
         """
         [Req: inferred — from SIGINT_SAVE_TIMEOUT = 5 constant]
