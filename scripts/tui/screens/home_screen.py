@@ -1549,15 +1549,29 @@ class HomeScreen(Screen):
             if manifest_status == "pending":
                 # Pending run: prompt user for mode and provider/model
                 from .modals import PendingRunModal
-                # Read manifest metadata for defaults
+                # Read manifest metadata for defaults, falling back to snapshot config
+                _default_provider = None
+                _default_model = None
                 try:
                     _manifest = load_manifest(run_dir)
                     _meta = _manifest.get("metadata", {}) if _manifest else {}
                     _default_provider = _meta.get("provider")
                     _default_model = _meta.get("model")
+                    # Fall back to snapshot config if metadata doesn't have provider/model
+                    if not _default_provider or not _default_model:
+                        import yaml
+                        config_name = _manifest.get("config", "") if _manifest else ""
+                        config_path = run_dir / config_name if config_name else None
+                        if config_path and config_path.exists():
+                            with open(config_path) as f:
+                                _config = yaml.safe_load(f)
+                            api = _config.get("api", {})
+                            if not _default_provider:
+                                _default_provider = api.get("provider")
+                            if not _default_model:
+                                _default_model = api.get("model")
                 except Exception:
-                    _default_provider = None
-                    _default_model = None
+                    pass
                 self.app.push_screen(
                     PendingRunModal(
                         run_name=run.get('name', ''),
