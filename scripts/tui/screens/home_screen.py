@@ -1178,6 +1178,8 @@ class HomeScreen(Screen):
             cost_msg = f" | Est. cost: ${cost_estimate:.4f}"
             if has_fan_out:
                 cost_msg += " ⚠ (fan-out may increase)"
+        elif has_fan_out:
+            cost_msg = " | ⚠ Pipeline has fan-out steps — costs may be significant"
         self.notify(f"Run '{run_name}' started in {mode_text} mode{cost_msg}")
 
         self._load_data()
