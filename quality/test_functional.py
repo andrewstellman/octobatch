@@ -727,7 +727,7 @@ class TestFitnessScenarios:
     def test_scenario_14_cost_respects_run_mode(self):
         """
         [Req: formal — BUG-6 / Finding 3a] Cost calculation must check run mode
-        and apply the correct multiplier (batch 0.5x vs realtime multiplier).
+        and apply the correct multiplier (batch 1x registry rates vs realtime multiplier).
         """
         main_screen_path = Path(__file__).parent.parent / "scripts" / "tui" / "screens" / "main_screen.py"
         if not main_screen_path.exists():

@@ -375,11 +375,14 @@ def _compute_cost(input_tokens, output_tokens, provider_name, model_name, is_rea
     input_rate = model_data.get("input_per_million", defaults.get("input_per_million", 1.0))
     output_rate = model_data.get("output_per_million", defaults.get("output_per_million", 2.0))
 
-    cost = (input_tokens * input_rate + output_tokens * output_rate) / 1_000_000
-
-    # Batch mode gets 50% discount (standard across providers)
-    if not is_realtime:
-        cost *= 0.5
+    # Registry rates ARE batch rates (1x). Realtime applies provider multiplier on top.
+    if is_realtime:
+        realtime_multiplier = model_data.get("realtime_multiplier",
+                                              provider_data.get("realtime_multiplier", 2.0))
+        cost = (input_tokens * input_rate * realtime_multiplier +
+                output_tokens * output_rate * realtime_multiplier) / 1_000_000
+    else:
+        cost = (input_tokens * input_rate + output_tokens * output_rate) / 1_000_000
 
     return cost
 
