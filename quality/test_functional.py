@@ -771,18 +771,16 @@ class TestFitnessScenarios:
 
     def test_scenario_14_get_model_pricing_unknown_model(self):
         """
-        [Req: formal — BUG-6 / Finding 3b] _get_model_pricing returns (0, 0) for
-        unknown models, not hardcoded rates.
+        [Req: formal — BUG-6 / Finding 3b] _get_model_pricing returns (0.0, 0.0) for
+        unknown models — no fallback to default_model or hardcoded rates.
         """
         sys.path.insert(0, str(Path(__file__).parent.parent / "scripts" / "tui" / "utils"))
         from runs import _get_model_pricing
 
         manifest = {"metadata": {"provider": "gemini", "model": "nonexistent-model-xyz", "mode": "batch"}}
         input_rate, output_rate = _get_model_pricing(manifest)
-        # Unknown model: should get 0.0 (cost unknown), not a hardcoded rate
-        # The default_model fallback may kick in, so we only assert no hardcoded 0.075
-        assert input_rate != 0.075 or output_rate != 0.30, (
-            "Finding 3b: must not return hardcoded Flash pricing for unknown model"
+        assert (input_rate, output_rate) == (0.0, 0.0), (
+            f"Unknown model must return (0.0, 0.0), got ({input_rate}, {output_rate})"
         )
 
     def test_scenario_15_init_run_without_yes_flag_requires_confirmation(self):

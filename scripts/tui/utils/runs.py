@@ -256,12 +256,7 @@ def _get_model_pricing(manifest: Dict[str, Any]) -> tuple:
     if model_name:
         model_data = provider_data.get("models", {}).get(model_name)
 
-    # Fall back to provider's default model
-    if not model_data:
-        default_model = provider_data.get("default_model")
-        if default_model:
-            model_data = provider_data.get("models", {}).get(default_model)
-
+    # Do NOT fall back to default_model — showing a wrong cost is worse than "cost unknown"
     if not model_data:
         return 0.0, 0.0
 
