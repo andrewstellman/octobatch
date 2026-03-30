@@ -2320,13 +2320,13 @@ Passed:        {passed}
                 return (0.0, total_tokens)
 
             # Apply pricing multiplier based on run mode
+            # Registry rates ARE batch rates (1x). Realtime applies provider multiplier on top.
             mode = metadata.get("mode", "batch")
             base_cost = input_tokens / 1_000_000 * input_rate + output_tokens / 1_000_000 * output_rate
             if mode == "realtime":
                 cost = base_cost * realtime_multiplier
             else:
-                # Batch mode: 50% discount (standard across providers)
-                cost = base_cost * 0.5
+                cost = base_cost
             return (cost, total_tokens)
         except Exception:
             return (0.0, 0)

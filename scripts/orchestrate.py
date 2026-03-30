@@ -3519,7 +3519,7 @@ def init_run(
                 )
                 est_input = total_units * 500 * llm_step_count
                 est_output = total_units * 200 * llm_step_count
-                cost_estimate = (est_input * input_rate + est_output * output_rate) / 1_000_000 * 0.5  # batch discount
+                cost_estimate = (est_input * input_rate + est_output * output_rate) / 1_000_000  # registry rates are batch rates
         except Exception:
             pass
 

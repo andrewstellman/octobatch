@@ -760,6 +760,14 @@ class TestFitnessScenarios:
         assert realtime_input > batch_input, (
             f"Realtime input rate ({realtime_input}) must be > batch ({batch_input})"
         )
+        # Batch rates must equal raw registry rates (no 0.5x discount)
+        # gemini-2.0-flash-001: input=0.075, output=0.30 per million
+        assert batch_input == 0.075, (
+            f"Batch input rate must be raw registry rate 0.075, got {batch_input}"
+        )
+        assert batch_output == 0.30, (
+            f"Batch output rate must be raw registry rate 0.30, got {batch_output}"
+        )
 
     def test_scenario_14_get_model_pricing_unknown_model(self):
         """

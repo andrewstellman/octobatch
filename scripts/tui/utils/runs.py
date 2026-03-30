@@ -270,11 +270,11 @@ def _get_model_pricing(manifest: Dict[str, Any]) -> tuple:
     if input_rate is None or output_rate is None:
         return 0.0, 0.0
 
-    # Apply mode-based multiplier: realtime uses provider multiplier, batch uses 50% discount
+    # Registry rates ARE batch rates (1x). Realtime applies provider multiplier on top.
     if mode == "realtime":
         return input_rate * realtime_multiplier, output_rate * realtime_multiplier
     else:
-        return input_rate * 0.5, output_rate * 0.5
+        return input_rate, output_rate
 
 
 def get_run_cost_value(manifest: Dict[str, Any]) -> float:
