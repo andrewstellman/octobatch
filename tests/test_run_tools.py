@@ -19,7 +19,14 @@ import pytest
 # Add scripts directory to path so run_tools module is importable
 sys.path.insert(0, str(Path(__file__).parent.parent / "scripts"))
 
-from run_tools import verify_run, repair_run, _verify_step, generate_report, _load_step_records
+from run_tools import (
+    verify_run,
+    repair_run,
+    _verify_step,
+    generate_report,
+    _load_step_records,
+    _compute_cost,
+)
 
 
 # =============================================================================
@@ -1764,7 +1771,7 @@ class TestGenerateReport:
         assert "in progress" in result["text"]
 
     def test_report_cost_uses_model_pricing(self, tmp_path):
-        """generate_report calculates cost using model registry pricing."""
+        """generate_report calculates realtime cost using model registry pricing."""
         run_dir = tmp_path / "cost_run"
         run_dir.mkdir()
         build_perfect_single_step_run(run_dir, num_units=1)
@@ -1781,12 +1788,13 @@ class TestGenerateReport:
             json.dump(manifest, f)
 
         result = generate_report(run_dir)
-        # Gemini flash: $0.075/M in, $0.3/M out, realtime = no batch discount
-        # cost = (1M * 0.075 + 1M * 0.3) / 1M = 0.375
-        assert abs(result["cost"] - 0.375) < 0.01
+        # Gemini flash batch rates in models.yaml: $0.075/M in, $0.30/M out.
+        # Realtime applies provider realtime_multiplier=2.0.
+        # cost = (0.075 + 0.30) * 2 = 0.75
+        assert abs(result["cost"] - 0.75) < 0.01
 
-    def test_report_cost_batch_discount(self, tmp_path):
-        """generate_report applies 50% batch discount."""
+    def test_report_cost_uses_registry_batch_rates(self, tmp_path):
+        """generate_report uses raw registry rates for batch mode."""
         run_dir = tmp_path / "batch_run"
         run_dir.mkdir()
         build_perfect_single_step_run(run_dir, num_units=1)
@@ -1803,8 +1811,49 @@ class TestGenerateReport:
             json.dump(manifest, f)
 
         result = generate_report(run_dir)
-        # Batch: (1M * 0.075 + 1M * 0.3) / 1M * 0.5 = 0.1875
-        assert abs(result["cost"] - 0.1875) < 0.01
+        # Batch uses registry rates as-is: 0.075 + 0.30 = 0.375
+        assert abs(result["cost"] - 0.375) < 0.01
+
+    def test_compute_cost_uses_registry_rates_for_batch_and_multiplier_for_realtime(self):
+        """_compute_cost uses 1x batch rates and applies realtime multiplier only in realtime."""
+        registry = {
+            "defaults": {
+                "input_per_million": 1.0,
+                "output_per_million": 2.0,
+                "realtime_multiplier": 2.0,
+            },
+            "providers": {
+                "openai": {
+                    "realtime_multiplier": 2.0,
+                    "models": {
+                        "gpt-4o-mini": {
+                            "input_per_million": 0.075,
+                            "output_per_million": 0.3,
+                        }
+                    },
+                }
+            },
+        }
+
+        batch_cost = _compute_cost(
+            input_tokens=1_000_000,
+            output_tokens=1_000_000,
+            provider_name="openai",
+            model_name="gpt-4o-mini",
+            is_realtime=False,
+            registry=registry,
+        )
+        realtime_cost = _compute_cost(
+            input_tokens=1_000_000,
+            output_tokens=1_000_000,
+            provider_name="openai",
+            model_name="gpt-4o-mini",
+            is_realtime=True,
+            registry=registry,
+        )
+
+        assert batch_cost == pytest.approx(0.375)
+        assert realtime_cost == pytest.approx(0.75)
 
     def test_report_top_errors(self, tmp_path):
         """generate_report extracts top errors from failure records."""
@@ -1851,3 +1900,75 @@ class TestGenerateReport:
         text = result["text"]
         assert "TOP ERRORS BY STEP" in text
         assert "Schema validation failed" in text
+
+
+# =============================================================================
+# _compute_cost pricing tests
+# =============================================================================
+
+class TestComputeCostPricing:
+    """Verify _compute_cost uses registry rates correctly for batch and realtime."""
+
+    def test_batch_cost_uses_registry_rates_directly(self):
+        """
+        Registry rates ARE batch rates. Batch mode must use them as-is (1x),
+        not apply a 0.5x discount.
+        """
+        from run_tools import _compute_cost, _load_model_registry
+
+        registry = _load_model_registry()
+        # gemini-2.0-flash-001: input=0.075, output=0.30 per million
+        input_tokens = 1_000_000
+        output_tokens = 1_000_000
+
+        cost = _compute_cost(input_tokens, output_tokens,
+                             "gemini", "gemini-2.0-flash-001",
+                             is_realtime=False, registry=registry)
+
+        # Batch cost = (1M * 0.075 + 1M * 0.30) / 1M = 0.375
+        assert abs(cost - 0.375) < 0.001, (
+            f"Batch cost should be 0.375 (raw registry rates), got {cost}"
+        )
+
+    def test_realtime_cost_applies_provider_multiplier(self):
+        """
+        Realtime mode applies the provider's realtime_multiplier on top of
+        registry (batch) rates.
+        """
+        from run_tools import _compute_cost, _load_model_registry
+
+        registry = _load_model_registry()
+        input_tokens = 1_000_000
+        output_tokens = 1_000_000
+
+        batch_cost = _compute_cost(input_tokens, output_tokens,
+                                   "gemini", "gemini-2.0-flash-001",
+                                   is_realtime=False, registry=registry)
+        realtime_cost = _compute_cost(input_tokens, output_tokens,
+                                      "gemini", "gemini-2.0-flash-001",
+                                      is_realtime=True, registry=registry)
+
+        # Gemini realtime_multiplier is 2.0
+        assert abs(realtime_cost - batch_cost * 2.0) < 0.001, (
+            f"Realtime cost should be 2x batch ({batch_cost * 2.0}), got {realtime_cost}"
+        )
+
+    def test_unknown_model_uses_defaults(self):
+        """
+        _compute_cost falls back to registry defaults for unknown models.
+        This is the report-generation path (not TUI) — it uses defaults
+        rather than returning 0 because reports need best-effort cost sums.
+        """
+        from run_tools import _compute_cost, _load_model_registry
+
+        registry = _load_model_registry()
+        cost = _compute_cost(1_000_000, 1_000_000,
+                             "gemini", "nonexistent-model-xyz",
+                             is_realtime=False, registry=registry)
+        # Should get defaults (1.0, 2.0) -> cost = 3.0
+        defaults = registry.get("defaults", {})
+        expected = (defaults.get("input_per_million", 1.0) +
+                    defaults.get("output_per_million", 2.0))
+        assert abs(cost - expected) < 0.001, (
+            f"Unknown model should use registry defaults, expected {expected}, got {cost}"
+        )
